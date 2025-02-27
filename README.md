@@ -17,6 +17,8 @@ cp ~/dotfiles-arch/.zshrc ~/.zshrc
 ```
 
 ```sh
+cp -r ~/dotfiles-arch/.config/* ~/config 
+
 cp ~/dotfiles-arch/.gitconfig ~/.gitconfig
 cp ~/dotfiles-arch/.git-credentials ~/.git-credentials
 
