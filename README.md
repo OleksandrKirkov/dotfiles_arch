@@ -13,6 +13,10 @@ chmod +x install.sh
 ```
 
 ```sh
+cp ~/dotfiles-arch/.zshrc ~/.zshrc
+```
+
+```sh
 cp ~/dotfiles-arch/.gitconfig ~/.gitconfig
 cp ~/dotfiles-arch/.git-credentials ~/.git-credentials
 
