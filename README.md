@@ -13,5 +13,8 @@ chmod +x install.sh
 ```
 
 ```sh
-cp ~/dotfiles/.gitconfig ~/.gitconfig
+cp ~/dotfiles-arch/.gitconfig ~/.gitconfig
+cp ~/dotfiles-arch/.git-credentials ~/.git-credentials
+
+git config --global credential.helper store
 ```
