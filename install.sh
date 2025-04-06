@@ -13,21 +13,36 @@ sudo pacman -S --noconfirm hyprland noto-fonts noto-fonts-cjk noto-fonts-emoji
 
 sudo pacman -S --needed git base-devel
 
-git clone https://aur.archlinux.org/yay.git
-
-cd yay
-makepkg -si
-cd ..
-rm -rf yay
-
-if [ -d "$HOME/.config/nvim" ]; then
-    echo "[Error]: nvim folder is exist. Deleting..."
-    rm -rf "$HOME/.config/nvim"
+echo "Installing yay..."
+if ! command -v yay &>/dev/null; then
+    git clone https://aur.archlinux.org/yay.git
+    cd yay
+    makepkg -si
+    cd ..
+    rm -rf yay
 fi
 
-git clone https://github.com/OleksandrKirkov/nvim.git ~/.config/nvim
+echo "Installing Neovim config..."
+NVIM_DIR="$HOME/.config/nvim"
+if [ ! -d "$HOME/.config/nvim" ]; then
+    git clone https://github.com/OleksandrKirkov/nvim.git "$NVIM_DIR"
+fi
 
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+echo "Installing oh-my-zsh..."
+if [ ! -d "$HOME/.oh-my-zsh" ]; then
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+fi
 
-git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+
+echo "Installing zsh plugins..."
+
+# zsh-autosuggestions
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
+    git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
+fi
+
+# zsh-syntax-highlighting
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]; then
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
+fi
