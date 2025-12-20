@@ -195,11 +195,3 @@ echo "Removing empty directories..."
 find "$CONFIG_DIR" -type d -empty -delete
 
 echo "Installing and configuration complete!"
-
-echo "Do reboot? [Y,n]"
-read input
-
-case "$input" in
-    [Nn]) echo "Do it later!" ;;
-    *) echo reboot ;;
-esac

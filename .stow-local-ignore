@@ -1,4 +1,4 @@
 ^/README.*
 \.git
 ^/install.sh
-\.git-credentials
+^/.git-credentials
