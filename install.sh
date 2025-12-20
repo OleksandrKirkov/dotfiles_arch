@@ -82,6 +82,7 @@ PACMAN_PACKAGES=(
     ccls
     python-pynvim
     lazygit
+    python-pynvim
 
     yazi
     discord
@@ -90,28 +91,22 @@ PACMAN_PACKAGES=(
     ranger
     cmatrix
     imv
+    curl
 
     nvidia
     nvidia-utils
     nvidia-settings
 )
 
-sudo pacman -S --noconfirm neovim python-pynvim git nodejs \
-    npm curl zsh nvidia nvidia-utils nvidia-settings nvidia-prime \
-    hyprland xdg-desktop-portal-hyprland wlroots wayland xorg-xwayland \
-    polkit-kde-agent dunst rofi kitty waybar wofi foot thunar hyprpaper flatpack
-
-sudo pacman -S --noconfirm hyprland noto-fonts noto-fonts-cjk noto-fonts-emoji
-
-sudo pacman -S --needed git base-devel
+sudo pacman -S --needed --noconfirm "${PACMAN_PACKAGES[@]}"
 
 echo "Installing yay..."
 if ! command -v yay &>/dev/null; then
-    git clone https://aur.archlinux.org/yay.git
-    cd yay
-    makepkg -si
+    git clone https://aur.archlinux.org/yay-bin.git
+    cd yay-bin
+    makepkg -si --noconfirm
     cd ..
-    rm -rf yay
+    rm -rf yay-bin
 fi
 
 AUR_PACKAGES=(
