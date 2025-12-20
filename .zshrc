@@ -3,12 +3,17 @@
 
 # Path to your Oh My Zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
+export PATH="$PATH:$HOME/go/bin"
+
+export JAVA_HOME=/usr/lib/jvm/java-25-openjdk
+export PATH="$JAVA_HOME/bin:$PATH"
+export PATH="$HOME/.npm-global/bin:$PATH"
 
 # Set name of the theme to load --- if set to "random", it will
 # load a random theme each time Oh My Zsh is loaded, in which case,
 # to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
-ZSH_THEME="darkblood"
+ZSH_THEME="robbyrussell"
 
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
@@ -70,12 +75,13 @@ ZSH_THEME="darkblood"
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git zsh-syntax-highlighting zsh-autosuggestions zsh-completions)
+plugins=(
+    git
+    zsh-syntax-highlighting
+    zsh-autosuggestions
+)
 
 source $ZSH/oh-my-zsh.sh
-
-# command for zsh-completions
-autoload -U compinit && compinit
 
 # User configuration
 
@@ -105,3 +111,56 @@ autoload -U compinit && compinit
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
+
+# pnpm
+export PNPM_HOME="/home/oleksandr/.local/share/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
+
+
+export HISTFILE=~/.zsh_history
+export SAVEHIST=10000
+export HISTSIZE=10000
+setopt HIST_IGNORE_DUPS
+setopt SHARE_HISTORY
+
+autoload -U colors && colors
+
+center_text() {
+    local text="$1"
+    local columns=$(tput cols)
+    local text_length=${#text}
+    local padding=$(( (columns - text_length) / 2))
+
+    if [ "$padding" -gt 0 ]; then
+        printf "%*s%s\n" "$padding" "" "$text"
+    else
+        echo "$text"
+    fi
+}
+
+ascii_banner() {
+echo -e "\e[32m"
+center_text "@@(@@%@@@@@@@@%@@@ @/@@@@/,&(@.%@@@@(@@@@@@@@%(@&.@@&*@@@@@@@@(@,%@@@@@#@@@.@#(@@*@@@@@@@@#*@#@@@*(&@@@&& @@@@@@@#@@@@@&"
+center_text "@@(@@%@@@@@@@@%@@@.,@@@@@ &&&@(&(@@@@*@@@@@@@@&@@*,@@ %@@@@@@@@/@.@@@@@%@@@.&%%@@*@@@@@@@@#/@&@@@.@.@%@@%*/@@@@@@&@@@@@@"
+center_text "&@#@@@@@@@@@@@%@@@ %@@@@*(&&@*@#&/@#%(%#####%@#%@*@#@&,@@@@@@@@@#@/@@@@@@@@,@&#&&*#%##%&@@((&@/@@%@&.@%@@# @@@@@@@%@@@@@"
+center_text "@&&@@@@@@@@@@@&@@@ @@&@@ @@@@@@*@@(@@@,@@@@@@@(#@(&%&@./@@@@@@@@@&@/@@@@&@@#@@(&@#*@@@@@@@##@@&@@@#&@*@%@@((@@@@@@(@@@@@"
+center_text "@@@&@@&@@@@@@@@@@@.@@/@*&&&@@@(@#&@(@@@,@@@@@@%@@&&@(@%&/@@@@@#@@@(&#@@@%@&@@@&#@%&@@@&%#&/(%@@%@@#&&&#&&@@,@@@@@@&@@@@@"
+center_text "@@@#@@@@@@@@@@@%@@*@%&@.@@@@@@@%#@&&/@%#%#((((@%#@%@@/@/@(@@@@%@@@%%(&@@#@/@@@&/@@@#*.  .#,,/#@#@@%@&&%&#%@@(@@@@@@%@@@@"
+center_text "@%@(@@@&@@@@@@@#@@##.@&%@@@@@@@%( ,** #. .  ,@@(*%%@@@(&@&(@@@@,@@@%@(@%%@,@@@%(,    ,,. ...     @/%@@&(@/&@#@@@@@@(@@@@"
+center_text ",.&&@@@@@@@@@@@&@@@*%@*@@#@(.   *((((///,*/. (   /@@@@@#/@@/@@@%/@@#&@&@(&%@@(*(@ #,(#%(#%/,/.%@@@* *,@#,@(%@#@@@@@&@@@@"
+center_text "@@& %@@@@@@@@@@@&@@,@@*& */@@/ %#%/%%%%((/(% %@@@@#%@@@@@#@@*@@@.%@&@@@#&*@&@@@@@@@&*&#%(.&%&*/@@@@@@&,*%*@%##@@@@@@%@@@"
+center_text ".@@@(@@@@@@@@@@@#@@(@##&@@@@@@@@@&/&#((#*&@@,(@@@@@@@@@@@@&@@&%@#@%@@@@%@*%@@@@@&.@@%@//*#%@@.&@@@@@&%%%%@*@@(&@@@@@/@@@"
+center_text "@#* #@@@@@@@@@@@&@@@#.&&&@@@@@*.@@@%@((/@&@@ @@@@@@@@@@@@@@@@@@@@%@%@@@@&@@&@@@@@.@@@@@@@@@@./@@@@&&%&@@@@&*@@/@@@@@&@@&"
+center_text "@@&@@(@@@@@@@@@@@%@@/ &%&%%@@@@@ @@@@@@@@@%,,&@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&*&%/ .,,. *%%&@@@@@@@@ %@.@@@@@@#@&"
+center_text ".,@%@ @@@@@@@@@@@#@@# @@@@@@&&&./%@@#@@@@&@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@&/. ((@@@@@(@@"
+center_text "@%@#@(/@@@@@@@@@@@&@@.@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@%@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@,..*(@@@@@&@@"
+center_text "@#@@@@*@@@@@@@@@@@#@@*%@@@@@@@@@@@@&@&&@@@@@@@@@@@@@@@@@@&&@@@@@@@#@@@@@@@&@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@% .&&@&@@@@@#@"
+echo -e "\e[0m"
+}
+
+#ascii_banner
+
