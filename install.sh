@@ -33,6 +33,8 @@ PACMAN_PACKAGES=(
     fastfetch
     btop
     stow
+    flatpak
+    eslint_d
 
     zsh
     ghostty
@@ -49,7 +51,6 @@ PACMAN_PACKAGES=(
     rofi
     wofi
     dunst
-    wlogout
     grim
     slurp
 
@@ -93,12 +94,15 @@ PACMAN_PACKAGES=(
     imv
     curl
 
-    nvidia
+    #nvidia
     nvidia-utils
     nvidia-settings
 )
 
 sudo pacman -S --needed --noconfirm "${PACMAN_PACKAGES[@]}"
+
+echo "Create directories"
+mkdir -p ~/develop ~/Pictures ~/Videos
 
 echo "Installing yay..."
 if ! command -v yay &>/dev/null; then
@@ -128,12 +132,13 @@ FLATPACK_APPS=(
     com.google.AndroidStudio
     com.valvesoftware.Steam
     org.pgadmin.pgadmin4
+    com.brave.Browser
 )
 
 sudo flatpak install -y "${FLATPACK_APPS[@]}"
 
 echo "Install npm packages..."
-npm install eslint_d vscode-langservers-extracted
+npm install -g eslint_d vscode-langservers-extracted
 
 echo "Installing Neovim config..."
 NVIM_DIR="$HOME/.config/nvim"
