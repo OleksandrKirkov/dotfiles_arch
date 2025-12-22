@@ -2,12 +2,11 @@
 	"layer": "top",
 	"position": "top",
 	"height": 27,
-	"width": 1900,
-	"margin": 0,
+	"margin": 4,
 
 	"modules-left": ["cpu", "memory"],
 	"modules-center": ["hyprland/workspaces"],
-	"modules-right": ["tray", "pulseaudio", "hyprland/language",  "clock"],
+	"modules-right": ["tray", "pulseaudio", "hyprland/language", "battery",  "clock"],
 
 	"cpu": {
 		"format": "  {usage}%",
@@ -23,13 +22,13 @@
 		"format": "{icon}",
 		"on-click": "activate",
 		"format-icons": {
-			"1": "",
+			"1": "",
 			"2": "",
-			"3": "",
-			"4": "󰊗",
-			"5": "󰖟",
-			"6": "󰳫",
-			"7": "",
+			"3": "",
+			"4": "",
+			"5": "",
+			"6": "",
+			"7": "",
 			},
 		"tooltip": false
 	},
@@ -37,7 +36,6 @@
 	"hyprland/language": {
 	  	"format": "{}",
 	  	"format-en": "EN",
-	  	"format-ru": "RU",
 	  	"format-uk": "UA",
 	},
 
@@ -45,6 +43,11 @@
 		"icon-size": 16,
 		"spacing": 16
 	},
+
+    "battery": {
+        "format": "{icon}  {capacity}%",
+        "format-icons": ["", "", "", "", ""]
+    },
 
 	"clock": {
 		"tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",

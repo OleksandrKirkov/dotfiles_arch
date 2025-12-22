@@ -7,7 +7,7 @@
 }
 
 #waybar {
-    background-color: rgba(1, 1, 1, 1);
+    background-color: rgba(1, 1, 1, 0.4);
     color: #cdd6f4;
     font-family: "JetBrainsMono Nerd Font";
     font-size: 16px;
@@ -25,7 +25,6 @@
     padding: 3px 10px;
     border-radius: 7px;
     margin: 1px 4px;
-    background-color: #000000;
 }
 
 #clock {
@@ -64,7 +63,6 @@
     box-shadow: inherit;
     text-shadow: inherit;
     color: #1e1e2e;
-    background-color: #cdd6f4;
 }
 
 #window {
