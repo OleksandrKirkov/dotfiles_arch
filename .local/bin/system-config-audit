@@ -1,0 +1,1397 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+PROGRAM="system-config-audit"
+VERSION="1.0.0"
+
+FULL=0
+INCLUDE_SENSITIVE=0
+USE_SUDO=1
+DOTFILES_DIR=""
+OUTPUT_BASE="${HOME}/system-config-audits"
+MAX_COPY_MB=10
+
+usage() {
+  cat <<'EOF'
+Usage: system-config-audit [options]
+
+Options:
+  --full                  Run slower package integrity checks (pacman -Qkk).
+  --include-sensitive     Include files that may contain credentials/tokens/keys.
+                          DO NOT commit the resulting snapshot to a public repo.
+  --no-sudo               Do not ask for sudo; skip privileged collection.
+  --dotfiles PATH         Record Git/status/symlink information for an old dotfiles repo.
+  --output DIR            Base output directory (default: ~/system-config-audits).
+  --max-copy-mb N         Skip regular files larger than N MiB (default: 10).
+  -h, --help              Show help.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --full)
+      FULL=1
+      shift
+      ;;
+    --include-sensitive)
+      INCLUDE_SENSITIVE=1
+      shift
+      ;;
+    --no-sudo)
+      USE_SUDO=0
+      shift
+      ;;
+    --dotfiles)
+      [[ $# -ge 2 ]] || {
+        echo "Missing value for --dotfiles" >&2
+        exit 2
+      }
+      DOTFILES_DIR="$2"
+      shift 2
+      ;;
+    --output)
+      [[ $# -ge 2 ]] || {
+        echo "Missing value for --output" >&2
+        exit 2
+      }
+      OUTPUT_BASE="$2"
+      shift 2
+      ;;
+    --max-copy-mb)
+      [[ $# -ge 2 && "$2" =~ ^[0-9]+$ && "$2" -gt 0 ]] || {
+        echo "--max-copy-mb expects a positive integer" >&2
+        exit 2
+      }
+      MAX_COPY_MB="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ ${EUID} -eq 0 ]]; then
+  echo "Do not run this script with sudo/root. Run it as your normal desktop user." >&2
+  exit 1
+fi
+
+umask 077
+
+STAMP="$(date +%Y%m%d-%H%M%S)"
+HOST="$(hostname 2>/dev/null || echo unknown-host)"
+
+OUT="${OUTPUT_BASE%/}/${HOST}-${STAMP}"
+RAW="$OUT/raw"
+SNAPSHOT="$OUT/snapshot"
+REPORT="$OUT/REPORT.md"
+MANIFEST="$OUT/manifest.tsv"
+OMITTED="$OUT/sensitive-omitted.txt"
+ERRORS="$OUT/errors.log"
+
+mkdir -p "$RAW" "$SNAPSHOT"
+
+: > "$MANIFEST"
+: > "$OMITTED"
+: > "$ERRORS"
+
+printf 'source\tdestination\ttype\tsize_bytes\tsha256\tmtime\n' > "$MANIFEST"
+
+log() {
+  printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"
+}
+
+warn() {
+  printf '[WARN] %s\n' "$*" | tee -a "$ERRORS" >&2
+}
+
+have() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+SUDO=()
+
+if (( USE_SUDO )); then
+  if have sudo; then
+    log "Requesting sudo once for privileged read-only inventory..."
+
+    if sudo -v; then
+      SUDO=(sudo)
+    else
+      warn "sudo authentication failed; continuing without privileged reads"
+      USE_SUDO=0
+    fi
+  else
+    warn "sudo is not installed; continuing without privileged reads"
+    USE_SUDO=0
+  fi
+fi
+
+capture() {
+  local rel="$1"
+  shift
+
+  local dst="$RAW/$rel"
+
+  mkdir -p "$(dirname "$dst")"
+
+  {
+    printf '$'
+    printf ' %q' "$@"
+    printf '\n\n'
+
+    "$@"
+  } >"$dst" 2>&1 || true
+}
+
+capture_shell() {
+  local rel="$1"
+  shift
+
+  local cmd="$*"
+  local dst="$RAW/$rel"
+
+  mkdir -p "$(dirname "$dst")"
+
+  {
+    printf '$ %s\n\n' "$cmd"
+    bash -o pipefail -c "$cmd"
+  } >"$dst" 2>&1 || true
+}
+
+capture_sudo_shell() {
+  local rel="$1"
+  shift
+
+  local cmd="$*"
+  local dst="$RAW/$rel"
+
+  mkdir -p "$(dirname "$dst")"
+
+  if (( USE_SUDO )); then
+    {
+      printf '$ sudo bash -o pipefail -c %q\n\n' "$cmd"
+      sudo bash -o pipefail -c "$cmd"
+    } >"$dst" 2>&1 || true
+  else
+    printf 'Skipped: sudo disabled/unavailable.\n' >"$dst"
+  fi
+}
+
+is_sensitive_path() {
+  local p="$1"
+
+  case "$p" in
+    */.ssh/id_*|*/.ssh/*_key|*/.ssh/*_key.pub)
+      return 0
+      ;;
+
+    */.gnupg/*|*/.password-store/*|*/.local/share/keyrings/*)
+      return 0
+      ;;
+
+    */.aws/credentials|*/.aws/config|*/.azure/*|*/.config/gcloud/*)
+      return 0
+      ;;
+
+    */.kube/config|*/.docker/config.json|*/.config/containers/auth.json)
+      return 0
+      ;;
+
+    */.npmrc|*/.pypirc|*/.netrc|*/.git-credentials|*/.cargo/credentials.toml)
+      return 0
+      ;;
+
+    */.config/gh/hosts.yml|*/.config/glab-cli/config.yml|*/.config/hub)
+      return 0
+      ;;
+
+    */rclone.conf|*/restic/*|*/sops/age/*|*/.config/age/*)
+      return 0
+      ;;
+
+    */Bitwarden/*|*/bitwarden/*|*/1Password/*|*/KeePass*/*|*/keepass*/*)
+      return 0
+      ;;
+
+    */cookies*|*/Cookies*|*/Login\ Data*|*/Web\ Data*|*/key4.db|*/logins.json)
+      return 0
+      ;;
+
+    */secrets/*|*/secret/*|*/credentials/*|*/tokens/*)
+      return 0
+      ;;
+
+    /etc/shadow|/etc/gshadow|/etc/shadow-*|/etc/gshadow-*)
+      return 0
+      ;;
+
+    /etc/ssh/ssh_host_*_key|/etc/ssh/ssh_host_*_key.pub)
+      return 0
+      ;;
+
+    /etc/NetworkManager/system-connections/*)
+      return 0
+      ;;
+
+    /etc/wireguard/*|*.nmconnection|*.ovpn|*.p12|*.pfx|*.pem|*.key)
+      return 0
+      ;;
+
+    /etc/pacman.d/gnupg/*)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+is_noise_path() {
+  local p="$1"
+
+  case "$p" in
+    */Cache/*|*/cache/*|*/Caches/*|*/GPUCache/*|*/Code\ Cache/*|*/ShaderCache/*)
+      return 0
+      ;;
+
+    */Crashpad/*|*/crash/*|*/Crash\ Reports/*|*/logs/*|*/Logs/*)
+      return 0
+      ;;
+
+    */node_modules/*|*/.git/objects/*|*/.git/lfs/*)
+      return 0
+      ;;
+
+    */workspaceStorage/*|*/globalStorage/*|*/History/*|*/Service\ Worker/*)
+      return 0
+      ;;
+
+    */blob_storage/*|*/DawnCache/*|*/GrShaderCache/*|*/VideoDecodeStats/*)
+      return 0
+      ;;
+
+    *.lock|*.log|*.journal|*.tmp|*.cache|*.db-wal|*.db-shm|*.sqlite-wal|*.sqlite-shm)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+looks_binary_or_state() {
+  local p="$1"
+
+  case "$p" in
+    *.sqlite|*.sqlite3|*.db|*.mdb|*.ldb|*.bin|*.blob|*.pak|*.sock|*.pid)
+      return 0
+      ;;
+
+    *.png|*.jpg|*.jpeg|*.webp|*.gif|*.ico|*.mp4|*.mkv|*.mp3|*.wav|*.pdf)
+      return 0
+      ;;
+
+    *.ttf|*.otf|*.woff|*.woff2)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+manifest_add() {
+  local src="$1"
+  local dst="$2"
+
+  local typ="other"
+  local size=""
+  local sha=""
+  local mtime=""
+
+  if [[ -L "$dst" ]]; then
+    typ="symlink"
+
+    size="$(
+      readlink "$dst" 2>/dev/null |
+        wc -c |
+        tr -d ' '
+    )"
+
+    sha="link->$(readlink "$dst" 2>/dev/null || true)"
+
+  elif [[ -f "$dst" ]]; then
+    typ="file"
+
+    size="$(stat -c '%s' "$dst" 2>/dev/null || echo '?')"
+
+    sha="$(
+      sha256sum "$dst" 2>/dev/null |
+        awk '{print $1}' ||
+        true
+    )"
+
+  elif [[ -d "$dst" ]]; then
+    typ="dir"
+  fi
+
+  mtime="$(
+    stat -c '%y' "$dst" 2>/dev/null |
+      cut -d. -f1 ||
+      true
+  )"
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$src" \
+    "$dst" \
+    "$typ" \
+    "$size" \
+    "$sha" \
+    "$mtime" \
+    >> "$MANIFEST"
+}
+
+copy_one() {
+  local src="$1"
+
+  [[ -e "$src" || -L "$src" ]] || return 0
+
+  if (( ! INCLUDE_SENSITIVE )) && is_sensitive_path "$src"; then
+    printf '%s\n' "$src" >> "$OMITTED"
+    return 0
+  fi
+
+  is_noise_path "$src" && return 0
+
+  if [[ -f "$src" && ! -L "$src" ]]; then
+    looks_binary_or_state "$src" && return 0
+
+    local size
+
+    size="$(stat -c '%s' "$src" 2>/dev/null || echo 0)"
+
+    if [[ "$size" =~ ^[0-9]+$ ]] &&
+      (( size > MAX_COPY_MB * 1024 * 1024 )); then
+      return 0
+    fi
+  fi
+
+  local dst="$SNAPSHOT$src"
+
+  mkdir -p "$(dirname "$dst")"
+
+  if [[ -L "$src" ]]; then
+    cp \
+      -a \
+      --no-dereference \
+      -- \
+      "$src" \
+      "$dst" \
+      2>>"$ERRORS" || true
+
+  elif [[ -r "$src" ]]; then
+    cp \
+      -a \
+      -- \
+      "$src" \
+      "$dst" \
+      2>>"$ERRORS" || true
+
+  elif (( USE_SUDO )); then
+    sudo cp \
+      -a \
+      -- \
+      "$src" \
+      "$dst" \
+      2>>"$ERRORS" || return 0
+
+    sudo chown \
+      "$(id -u):$(id -g)" \
+      "$dst" \
+      2>>"$ERRORS" || true
+  else
+    return 0
+  fi
+
+  if [[ -e "$dst" || -L "$dst" ]]; then
+    manifest_add "$src" "$dst"
+  fi
+}
+
+copy_tree_filtered() {
+  local root="$1"
+
+  [[ -d "$root" ]] || return 0
+
+  if [[ -r "$root" && -x "$root" ]]; then
+    while IFS= read -r -d '' item; do
+      copy_one "$item"
+    done < <(
+      find "$root" \
+        -xdev \
+        \( -type f -o -type l \) \
+        -print0 \
+        2>>"$ERRORS"
+    )
+
+  elif (( USE_SUDO )); then
+    while IFS= read -r -d '' item; do
+      copy_one "$item"
+    done < <(
+      sudo find "$root" \
+        -xdev \
+        \( -type f -o -type l \) \
+        -print0 \
+        2>>"$ERRORS"
+    )
+  fi
+}
+
+copy_candidates() {
+  local p
+
+  for p in "$@"; do
+    if [[ -d "$p" && ! -L "$p" ]]; then
+      copy_tree_filtered "$p"
+    else
+      copy_one "$p"
+    fi
+  done
+}
+
+redact_stream() {
+  sed -E \
+    -e 's#(https?://)[^/@[:space:]]+:[^/@[:space:]]+@#\1***:***@#g' \
+    -e 's#((token|password|passwd|secret|api[_-]?key|client[_-]?secret)[[:space:]]*[=:][[:space:]]*)[^[:space:]]+#\1<redacted>#Ig' \
+    -e 's#(Authorization:[[:space:]]*(Bearer|Basic)[[:space:]]+)[^[:space:]]+#\1<redacted>#Ig'
+}
+
+log "Collecting base system information..."
+
+capture \
+  system/date.txt \
+  date \
+  --iso-8601=seconds
+
+capture \
+  system/uname.txt \
+  uname \
+  -a
+
+capture \
+  system/os-release.txt \
+  cat \
+  /etc/os-release
+
+capture \
+  system/hostnamectl.txt \
+  hostnamectl
+
+capture \
+  system/localectl.txt \
+  localectl
+
+capture \
+  system/timedatectl.txt \
+  timedatectl
+
+capture_shell \
+  system/user.txt \
+  'id; echo; getent passwd "$USER"; echo; loginctl show-user "$USER" -p Linger -p State -p Sessions 2>/dev/null || true'
+
+capture \
+  system/lscpu.txt \
+  lscpu
+
+capture_shell \
+  system/memory.txt \
+  'free -h; echo; swapon --show --output=NAME,TYPE,SIZE,USED,PRIO 2>/dev/null || true'
+
+capture \
+  system/lsblk.txt \
+  lsblk \
+  -e7 \
+  -o NAME,PATH,TYPE,SIZE,FSTYPE,FSVER,LABEL,UUID,MOUNTPOINTS
+
+capture_shell \
+  system/findmnt.txt \
+  'findmnt --real -o TARGET,SOURCE,FSTYPE,OPTIONS'
+
+capture_shell \
+  system/pci.txt \
+  'command -v lspci >/dev/null && lspci -nnk || true'
+
+capture_shell \
+  system/usb.txt \
+  'command -v lsusb >/dev/null && lsusb || true'
+
+log "Collecting package inventory..."
+
+if have pacman; then
+  capture_shell \
+    packages/pacman-explicit.txt \
+    'LC_ALL=C pacman -Qqe | sort'
+
+  capture_shell \
+    packages/pacman-explicit-native.txt \
+    'LC_ALL=C pacman -Qqen | sort'
+
+  capture_shell \
+    packages/pacman-explicit-foreign-aur.txt \
+    'LC_ALL=C pacman -Qqem | sort'
+
+  capture_shell \
+    packages/pacman-orphans.txt \
+    'LC_ALL=C pacman -Qdtq 2>/dev/null | sort || true'
+
+  capture_shell \
+    packages/pacman-all.txt \
+    'LC_ALL=C pacman -Q | sort'
+
+  capture_shell \
+    packages/pacman-modified-backups.txt \
+    "LC_ALL=C pacman -Qii 2>/dev/null | awk '/^\// && /\[modified\]$/ {print}' | sort -u"
+
+  if (( FULL )); then
+    capture_shell \
+      packages/pacman-qkk.txt \
+      'LC_ALL=C pacman -Qkk 2>&1 | grep -Ev "^warning: .*: [0-9]+ total files, 0 altered files$" || true'
+  else
+    printf \
+      'Skipped. Re-run with --full to execute pacman -Qkk.\n' \
+      > "$RAW/packages/pacman-qkk.txt"
+  fi
+
+  capture_shell \
+    packages/etc-unowned.txt \
+    '
+      owned=$(mktemp)
+      actual=$(mktemp)
+
+      trap "rm -f $owned $actual" EXIT
+
+      LC_ALL=C pacman -Qql 2>/dev/null |
+        grep "^/etc/" |
+        sed "s#/$##" |
+        sort -u > "$owned"
+
+      find /etc \
+        -xdev \
+        \( -type f -o -type l \) \
+        -print \
+        2>/dev/null |
+        sort -u > "$actual"
+
+      comm -23 "$actual" "$owned"
+    '
+fi
+
+if have flatpak; then
+  capture_shell \
+    packages/flatpak-apps.txt \
+    'flatpak list --app --columns=application,branch,origin,installation 2>/dev/null || flatpak list --app'
+
+  capture_shell \
+    packages/flatpak-overrides.txt \
+    '
+      echo "# Global overrides"
+
+      flatpak override --show 2>/dev/null || true
+
+      echo
+      echo "# Per-app overrides"
+
+      flatpak list \
+        --app \
+        --columns=application \
+        2>/dev/null |
+      while read -r app; do
+        out=$(flatpak override --show "$app" 2>/dev/null || true)
+
+        if [ -n "$out" ]; then
+          echo "## $app"
+          echo "$out"
+          echo
+        fi
+      done
+    '
+fi
+
+if have snap; then
+  capture_shell \
+    packages/snap.txt \
+    'snap list 2>/dev/null || true'
+fi
+
+log "Collecting systemd state..."
+
+capture_shell \
+  systemd/system-enabled.txt \
+  'systemctl list-unit-files --state=enabled --no-pager --no-legend 2>/dev/null || true'
+
+capture_shell \
+  systemd/system-running.txt \
+  'systemctl list-units --type=service --state=running --no-pager --no-legend 2>/dev/null || true'
+
+capture_shell \
+  systemd/system-timers.txt \
+  'systemctl list-timers --all --no-pager 2>/dev/null || true'
+
+capture_shell \
+  systemd/system-failed.txt \
+  'systemctl --failed --no-pager 2>/dev/null || true'
+
+capture_shell \
+  systemd/system-default-target.txt \
+  'systemctl get-default 2>/dev/null || true'
+
+capture_shell \
+  systemd/user-enabled.txt \
+  'systemctl --user list-unit-files --state=enabled --no-pager --no-legend 2>/dev/null || true'
+
+capture_shell \
+  systemd/user-running.txt \
+  'systemctl --user list-units --type=service --state=running --no-pager --no-legend 2>/dev/null || true'
+
+capture_shell \
+  systemd/user-timers.txt \
+  'systemctl --user list-timers --all --no-pager 2>/dev/null || true'
+
+capture_shell \
+  systemd/user-failed.txt \
+  'systemctl --user --failed --no-pager 2>/dev/null || true'
+
+capture_shell \
+  systemd/user-environment-names.txt \
+  'systemctl --user show-environment 2>/dev/null | sed "s/=.*$/=<value omitted>/" | sort || true'
+
+log "Collecting Hyprland / Wayland / desktop state..."
+
+if have hyprctl; then
+  capture \
+    desktop/hyprland-version.txt \
+    hyprctl \
+    version
+
+  capture \
+    desktop/hyprland-systeminfo.txt \
+    hyprctl \
+    systeminfo
+
+  capture \
+    desktop/hyprland-monitors.txt \
+    hyprctl \
+    monitors \
+    all
+
+  capture \
+    desktop/hyprland-devices.txt \
+    hyprctl \
+    devices
+
+  capture \
+    desktop/hyprland-binds.txt \
+    hyprctl \
+    binds
+
+  capture_shell \
+    desktop/hyprland-plugins.txt \
+    'hyprctl plugins list 2>/dev/null || true'
+fi
+
+if have hyprpm; then
+  capture_shell \
+    desktop/hyprpm.txt \
+    'hyprpm list 2>/dev/null || true'
+fi
+
+if have wpctl; then
+  capture_shell \
+    desktop/pipewire-wpctl.txt \
+    'wpctl status 2>/dev/null || true'
+fi
+
+if have pactl; then
+  capture_shell \
+    desktop/pactl-info.txt \
+    'pactl info 2>/dev/null || true'
+fi
+
+if have dconf; then
+  capture_shell \
+    desktop/dconf-dump.txt \
+    'dconf dump / 2>/dev/null || true'
+fi
+
+if have gsettings; then
+  capture_shell \
+    desktop/gsettings.txt \
+    'gsettings list-recursively 2>/dev/null || true'
+fi
+
+if have fc-list; then
+  capture_shell \
+    desktop/font-families.txt \
+    'fc-list : family 2>/dev/null | sed "s/,.*//" | sort -fu'
+fi
+
+capture_shell \
+  desktop/session-env.txt \
+  '
+    printenv |
+      grep -E "^(XDG_|WAYLAND_|DISPLAY=|HYPR|GDK_|GTK_|QT_|SDL_|MOZ_|ELECTRON_|BROWSER=|EDITOR=|VISUAL=|TERMINAL=|LANG=|LC_|PATH=|SSH_AUTH_SOCK=)" |
+      sort
+  '
+
+log "Collecting boot, kernel and hardware tuning..."
+
+capture \
+  boot/proc-cmdline.txt \
+  cat \
+  /proc/cmdline
+
+capture_shell \
+  boot/bootctl.txt \
+  'command -v bootctl >/dev/null && bootctl status 2>/dev/null || true'
+
+capture_shell \
+  boot/sbctl.txt \
+  'command -v sbctl >/dev/null && sbctl status 2>/dev/null || true'
+
+capture_shell \
+  kernel/lsmod.txt \
+  'lsmod 2>/dev/null || true'
+
+capture_shell \
+  kernel/sysctl-selected.txt \
+  '
+    for k in \
+      kernel.sysrq \
+      kernel.nmi_watchdog \
+      kernel.unprivileged_userns_clone \
+      vm.swappiness \
+      vm.vfs_cache_pressure \
+      vm.max_map_count \
+      fs.inotify.max_user_watches \
+      fs.file-max \
+      net.ipv4.ip_forward \
+      net.ipv6.conf.all.disable_ipv6
+    do
+      sysctl "$k" 2>/dev/null || true
+    done
+  '
+
+capture_shell \
+  power/powerprofilesctl.txt \
+  'command -v powerprofilesctl >/dev/null && { powerprofilesctl get; echo; powerprofilesctl list; } 2>/dev/null || true'
+
+capture_shell \
+  power/tlp.txt \
+  'command -v tlp-stat >/dev/null && tlp-stat -s -c 2>/dev/null || true'
+
+capture_shell \
+  power/cpupower.txt \
+  'command -v cpupower >/dev/null && cpupower frequency-info 2>/dev/null || true'
+
+log "Collecting networking state without Wi-Fi/VPN secrets..."
+
+capture_shell \
+  network/ip-address.txt \
+  'ip -brief address 2>/dev/null || true'
+
+capture_shell \
+  network/ip-route.txt \
+  'ip route show table all 2>/dev/null || true'
+
+capture_shell \
+  network/resolvectl.txt \
+  'command -v resolvectl >/dev/null && resolvectl status 2>/dev/null || true'
+
+capture_shell \
+  network/networkmanager-connections.txt \
+  'command -v nmcli >/dev/null && nmcli -t -f NAME,TYPE,DEVICE connection show 2>/dev/null || true'
+
+capture_shell \
+  network/networkctl.txt \
+  'command -v networkctl >/dev/null && networkctl list --no-pager 2>/dev/null || true'
+
+capture_shell \
+  network/rfkill.txt \
+  'command -v rfkill >/dev/null && rfkill list 2>/dev/null || true'
+
+capture_shell \
+  network/bluetooth.txt \
+  'command -v bluetoothctl >/dev/null && bluetoothctl show 2>/dev/null || true'
+
+log "Collecting firewall state..."
+
+capture_sudo_shell \
+  security/nftables.txt \
+  'command -v nft >/dev/null && nft list ruleset 2>/dev/null || true'
+
+capture_sudo_shell \
+  security/iptables.txt \
+  'command -v iptables-save >/dev/null && iptables-save 2>/dev/null || true'
+
+capture_sudo_shell \
+  security/ufw.txt \
+  'command -v ufw >/dev/null && ufw status verbose 2>/dev/null || true'
+
+capture_shell \
+  security/firewalld.txt \
+  'command -v firewall-cmd >/dev/null && firewall-cmd --list-all 2>/dev/null || true'
+
+log "Collecting shell and developer tooling..."
+
+capture_shell \
+  shell/shells.txt \
+  'cat /etc/shells 2>/dev/null; echo; printf "current shell: %s\n" "$SHELL"'
+
+capture_shell \
+  shell/aliases-bash.txt \
+  'bash -lic "alias" 2>/dev/null || true'
+
+if have zsh; then
+  capture_shell \
+    shell/aliases-zsh.txt \
+    'zsh -lic "alias" 2>/dev/null || true'
+fi
+
+if have fish; then
+  capture_shell \
+    shell/fish-functions.txt \
+    'fish -lc "functions -n" 2>/dev/null || true'
+fi
+
+capture_shell \
+  dev/tool-versions.txt \
+  '
+    for c in \
+      bash \
+      zsh \
+      fish \
+      git \
+      gh \
+      nvim \
+      vim \
+      tmux \
+      starship \
+      direnv \
+      mise \
+      asdf \
+      node \
+      npm \
+      pnpm \
+      yarn \
+      bun \
+      deno \
+      python \
+      python3 \
+      pip \
+      pipx \
+      uv \
+      ruby \
+      go \
+      cargo \
+      rustc \
+      docker \
+      podman \
+      kubectl \
+      helm \
+      terraform \
+      opentofu \
+      ansible
+    do
+      if command -v "$c" >/dev/null 2>&1; then
+        printf "## %s -> %s\n" "$c" "$(command -v "$c")"
+
+        "$c" --version 2>&1 |
+          head -n 3 ||
+          true
+
+        echo
+      fi
+    done
+  '
+
+capture_shell \
+  dev/git-global.txt \
+  'git config --global --show-origin --list 2>/dev/null | sed -E "s#(https?://)[^/@[:space:]]+:[^/@[:space:]]+@#\1***:***@#g" || true'
+
+capture_shell \
+  dev/npm-global.txt \
+  'command -v npm >/dev/null && npm -g ls --depth=0 2>/dev/null || true'
+
+capture_shell \
+  dev/pnpm-global.txt \
+  'command -v pnpm >/dev/null && pnpm list -g --depth=0 2>/dev/null || true'
+
+capture_shell \
+  dev/bun-global.txt \
+  'command -v bun >/dev/null && bun pm -g ls 2>/dev/null || true'
+
+capture_shell \
+  dev/cargo-install.txt \
+  'command -v cargo >/dev/null && cargo install --list 2>/dev/null || true'
+
+capture_shell \
+  dev/pipx.txt \
+  'command -v pipx >/dev/null && pipx list --short 2>/dev/null || true'
+
+capture_shell \
+  dev/go-env.txt \
+  'command -v go >/dev/null && go env GOPATH GOROOT GOTOOLCHAIN GOENV 2>/dev/null || true'
+
+capture_shell \
+  dev/docker-contexts.txt \
+  'command -v docker >/dev/null && docker context ls 2>/dev/null || true'
+
+capture_shell \
+  dev/podman-connections.txt \
+  'command -v podman >/dev/null && podman system connection list 2>/dev/null || true'
+
+capture_shell \
+  dev/kube-context-names.txt \
+  'command -v kubectl >/dev/null && { kubectl config current-context 2>/dev/null || true; kubectl config get-contexts -o name 2>/dev/null || true; }'
+
+log "Collecting cron and scheduled jobs..."
+
+capture_shell \
+  scheduled/user-crontab.txt \
+  'crontab -l 2>/dev/null || true'
+
+capture_sudo_shell \
+  scheduled/root-crontab.txt \
+  'crontab -l 2>/dev/null || true'
+
+log "Inventorying dotfiles, symlinks and config trees..."
+
+capture_shell \
+  files/home-top-level.txt \
+  'find "$HOME" -maxdepth 1 -mindepth 1 -printf "%y %TY-%Tm-%Td %TH:%TM %p -> %l\n" 2>/dev/null | sort'
+
+capture_shell \
+  files/home-symlinks.txt \
+  'find "$HOME" -xdev -maxdepth 5 -type l -printf "%p -> %l\n" 2>/dev/null | sort'
+
+capture_shell \
+  files/config-tree.txt \
+  'find "${XDG_CONFIG_HOME:-$HOME/.config}" -xdev -maxdepth 3 \( -type f -o -type l \) -printf "%TY-%Tm-%Td %TH:%TM %s %p -> %l\n" 2>/dev/null | sort -r'
+
+capture_shell \
+  files/local-share-applications.txt \
+  'find "$HOME/.local/share/applications" -maxdepth 2 \( -type f -o -type l \) -printf "%p -> %l\n" 2>/dev/null | sort || true'
+
+capture_shell \
+  files/local-bin.txt \
+  'find "$HOME/.local/bin" "$HOME/bin" /usr/local/bin /usr/local/sbin -maxdepth 2 \( -type f -o -type l \) -printf "%m %u:%g %TY-%Tm-%Td %TH:%TM %p -> %l\n" 2>/dev/null | sort || true'
+
+if [[ -n "$DOTFILES_DIR" ]]; then
+  DOTFILES_DIR="$(
+    readlink -f "$DOTFILES_DIR" 2>/dev/null ||
+      printf '%s' "$DOTFILES_DIR"
+  )"
+
+  capture_shell \
+    dotfiles/repo.txt \
+    "printf 'dotfiles_dir=%q\n' '$DOTFILES_DIR'; git -C '$DOTFILES_DIR' status --short --branch 2>/dev/null || true; echo; git -C '$DOTFILES_DIR' remote -v 2>/dev/null | sed -E 's#(https?://)[^/@[:space:]]+:[^/@[:space:]]+@#\1***:***@#g' || true"
+
+  capture_shell \
+    dotfiles/symlinks-into-repo.txt \
+    "find '$HOME' -xdev -maxdepth 6 -type l -print0 2>/dev/null | while IFS= read -r -d '' p; do t=\$(readlink -f \"\$p\" 2>/dev/null || true); case \"\$t\" in '$DOTFILES_DIR'/*) printf '%s -> %s\n' \"\$p\" \"\$t\";; esac; done | sort"
+fi
+
+log "Copying safe configuration snapshot..."
+
+copy_candidates \
+  "$HOME/.config" \
+  "$HOME/.bashrc" \
+  "$HOME/.bash_profile" \
+  "$HOME/.bash_login" \
+  "$HOME/.profile" \
+  "$HOME/.zshrc" \
+  "$HOME/.zprofile" \
+  "$HOME/.zlogin" \
+  "$HOME/.zshenv" \
+  "$HOME/.config/fish" \
+  "$HOME/.tmux.conf" \
+  "$HOME/.vimrc" \
+  "$HOME/.ideavimrc" \
+  "$HOME/.gitconfig" \
+  "$HOME/.gitignore_global" \
+  "$HOME/.xprofile" \
+  "$HOME/.xinitrc" \
+  "$HOME/.Xresources" \
+  "$HOME/.Xdefaults" \
+  "$HOME/.pam_environment" \
+  "$HOME/.ssh/config" \
+  "$HOME/.local/bin" \
+  "$HOME/bin" \
+  "$HOME/.local/share/applications" \
+  "$HOME/.local/share/systemd/user" \
+  "$HOME/.local/share/fonts" \
+  "$HOME/.local/share/icons" \
+  "$HOME/.local/share/themes"
+
+copy_candidates \
+  /etc/fstab \
+  /etc/crypttab \
+  /etc/hosts \
+  /etc/hostname \
+  /etc/locale.conf \
+  /etc/vconsole.conf \
+  /etc/environment \
+  /etc/environment.d \
+  /etc/profile \
+  /etc/profile.d \
+  /etc/pacman.conf \
+  /etc/makepkg.conf \
+  /etc/makepkg.conf.d \
+  /etc/pacman.d/hooks \
+  /etc/pacman.d/mirrorlist \
+  /etc/paru.conf \
+  /etc/yay.conf \
+  /etc/mkinitcpio.conf \
+  /etc/mkinitcpio.conf.d \
+  /etc/kernel/cmdline \
+  /etc/kernel/install.conf \
+  /etc/default/grub \
+  /etc/default/limine \
+  /etc/limine-entry-tool.conf \
+  /boot/loader/loader.conf \
+  /boot/loader/entries \
+  /boot/limine.conf \
+  /etc/modprobe.d \
+  /etc/modules-load.d \
+  /etc/sysctl.conf \
+  /etc/sysctl.d \
+  /etc/udev/rules.d \
+  /etc/tmpfiles.d \
+  /etc/systemd/system \
+  /etc/systemd/user \
+  /etc/xdg \
+  /etc/greetd \
+  /etc/sddm.conf \
+  /etc/sddm.conf.d \
+  /etc/NetworkManager/conf.d \
+  /etc/systemd/network \
+  /etc/iwd/main.conf \
+  /etc/pipewire \
+  /etc/wireplumber \
+  /etc/pulse \
+  /etc/keyd \
+  /etc/interception \
+  /etc/libinput \
+  /etc/tlp.conf \
+  /etc/tlp.d \
+  /etc/auto-cpufreq.conf \
+  /etc/nftables.conf \
+  /etc/ufw \
+  /etc/firewalld \
+  /etc/ssh/sshd_config \
+  /etc/ssh/sshd_config.d \
+  /etc/sudoers \
+  /etc/sudoers.d \
+  /etc/security \
+  /etc/pam.d \
+  /etc/cron.d \
+  /etc/cron.daily \
+  /etc/cron.hourly \
+  /etc/cron.weekly \
+  /etc/cron.monthly \
+  /usr/local/bin \
+  /usr/local/sbin \
+  /usr/local/etc \
+  /usr/local/share/applications
+
+XDG_CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
+
+copy_candidates \
+  "$XDG_CFG/hypr" \
+  "$XDG_CFG/uwsm" \
+  "$XDG_CFG/waybar" \
+  "$XDG_CFG/swaync" \
+  "$XDG_CFG/mako" \
+  "$XDG_CFG/rofi" \
+  "$XDG_CFG/wofi"
+
+for f in \
+  "$RAW/dev/git-global.txt" \
+  "$RAW/dotfiles/repo.txt"
+do
+  [[ -f "$f" ]] || continue
+
+  tmp="${f}.tmp"
+
+  redact_stream < "$f" > "$tmp"
+
+  mv "$tmp" "$f"
+done
+
+sort \
+  -u \
+  -o "$OMITTED" \
+  "$OMITTED"
+
+log "Building Markdown report..."
+
+count_lines() {
+  if [[ -f "$1" ]]; then
+    grep -vc '^$' "$1" 2>/dev/null || echo 0
+  else
+    echo 0
+  fi
+}
+
+count_snapshot() {
+  find "$SNAPSHOT" \
+    \( -type f -o -type l \) \
+    2>/dev/null |
+    wc -l |
+    tr -d ' '
+}
+
+PACMAN_EXPLICIT="$(
+  count_lines "$RAW/packages/pacman-explicit.txt"
+)"
+
+PACMAN_AUR="$(
+  count_lines "$RAW/packages/pacman-explicit-foreign-aur.txt"
+)"
+
+PACMAN_ORPHANS="$(
+  count_lines "$RAW/packages/pacman-orphans.txt"
+)"
+
+MODIFIED_BACKUPS="$(
+  count_lines "$RAW/packages/pacman-modified-backups.txt"
+)"
+
+ETC_UNOWNED="$(
+  count_lines "$RAW/packages/etc-unowned.txt"
+)"
+
+SNAPSHOT_COUNT="$(
+  count_snapshot
+)"
+
+OMITTED_COUNT="$(
+  count_lines "$OMITTED"
+)"
+
+cat > "$REPORT" <<EOF
+# System configuration audit
+
+Generated: **$(date --iso-8601=seconds)**  
+Host: **$HOST**  
+User: **$USER**  
+Script: **$PROGRAM $VERSION**
+
+> This is an inventory/snapshot, not a claim that every listed file was manually edited. The most useful manual-change signals are modified pacman backup files, unowned files under \`/etc\`, custom systemd units, scripts under user/\`/usr/local\` paths, and your XDG/Hyprland configuration.
+
+## Summary
+
+| Item | Count |
+|---|---:|
+| Explicit pacman packages | $PACMAN_EXPLICIT |
+| Explicit foreign/AUR packages | $PACMAN_AUR |
+| Pacman orphans | $PACMAN_ORPHANS |
+| Modified pacman backup files | $MODIFIED_BACKUPS |
+| Unowned files/symlinks under /etc | $ETC_UNOWNED |
+| Files/symlinks copied into safe snapshot | $SNAPSHOT_COUNT |
+| Sensitive paths omitted | $OMITTED_COUNT |
+
+## Start here: likely manual changes
+
+1. [Modified pacman backup files](raw/packages/pacman-modified-backups.txt) — package-owned config files whose backup copy differs from the packaged baseline.
+2. [Unowned /etc files](raw/packages/etc-unowned.txt) — strong candidates for administrator-created configuration; review generated files too.
+3. [User-enabled systemd units](raw/systemd/user-enabled.txt) and [system-enabled units](raw/systemd/system-enabled.txt).
+4. [Home symlinks](raw/files/home-symlinks.txt) — useful for reconstructing GNU Stow/chezmoi/manual symlink layouts.
+5. [XDG config tree](raw/files/config-tree.txt) — newest files are listed first.
+6. [Local scripts](raw/files/local-bin.txt) — user scripts and files under /usr/local/bin/sbin.
+7. [Snapshot manifest](manifest.tsv) — exact source path, snapshot destination, size, SHA-256 and mtime.
+8. [Sensitive files omitted](sensitive-omitted.txt) — review these manually instead of blindly committing them to dotfiles.
+
+## Hyprland / Wayland
+
+- [Hyprland version](raw/desktop/hyprland-version.txt)
+- [Hyprland system info](raw/desktop/hyprland-systeminfo.txt)
+- [Monitors](raw/desktop/hyprland-monitors.txt)
+- [Input devices](raw/desktop/hyprland-devices.txt)
+- [Keybinds](raw/desktop/hyprland-binds.txt)
+- [Plugins](raw/desktop/hyprland-plugins.txt)
+- [Session environment](raw/desktop/session-env.txt)
+- Snapshot paths: \`snapshot$XDG_CFG/hypr\`, Waybar, SwayNC/Mako, Rofi/Wofi, UWSM when present.
+
+## Packages
+
+- [Explicit packages](raw/packages/pacman-explicit.txt)
+- [Explicit official/native packages](raw/packages/pacman-explicit-native.txt)
+- [Explicit foreign/AUR packages](raw/packages/pacman-explicit-foreign-aur.txt)
+- [Orphans](raw/packages/pacman-orphans.txt)
+- [All pacman packages](raw/packages/pacman-all.txt)
+- [pacman -Qkk results](raw/packages/pacman-qkk.txt)
+- [Flatpak apps](raw/packages/flatpak-apps.txt)
+- [Flatpak overrides](raw/packages/flatpak-overrides.txt)
+
+## systemd
+
+- [Enabled system units](raw/systemd/system-enabled.txt)
+- [Running system services](raw/systemd/system-running.txt)
+- [System timers](raw/systemd/system-timers.txt)
+- [Enabled user units](raw/systemd/user-enabled.txt)
+- [Running user services](raw/systemd/user-running.txt)
+- [User timers](raw/systemd/user-timers.txt)
+- Snapshot: \`snapshot/etc/systemd/system\`, \`snapshot$HOME/.config/systemd/user\`, \`snapshot$HOME/.local/share/systemd/user\`.
+
+## Boot / kernel / hardware tuning
+
+- [Kernel command line](raw/boot/proc-cmdline.txt)
+- [bootctl](raw/boot/bootctl.txt)
+- [Secure Boot / sbctl](raw/boot/sbctl.txt)
+- [Loaded modules](raw/kernel/lsmod.txt)
+- [Selected sysctls](raw/kernel/sysctl-selected.txt)
+- Snapshot includes mkinitcpio, bootloader configs, modprobe.d, modules-load.d, sysctl.d, udev rules and tmpfiles.d when present.
+
+## Desktop settings
+
+- [dconf dump](raw/desktop/dconf-dump.txt)
+- [gsettings](raw/desktop/gsettings.txt)
+- [Font families](raw/desktop/font-families.txt)
+- [PipeWire/WirePlumber state](raw/desktop/pipewire-wpctl.txt)
+- Snapshot includes the safe portion of \`~/.config\`, desktop entries, themes/icons/fonts and desktop/audio configs.
+
+## Networking
+
+- [Interfaces](raw/network/ip-address.txt)
+- [Routes](raw/network/ip-route.txt)
+- [Resolver](raw/network/resolvectl.txt)
+- [NetworkManager profile names only](raw/network/networkmanager-connections.txt)
+- [rfkill](raw/network/rfkill.txt)
+- Wi-Fi PSKs, WireGuard private keys, VPN profile secrets and NetworkManager system connection files are omitted unless \`--include-sensitive\` is used.
+
+## Shell / development environment
+
+- [Shells](raw/shell/shells.txt)
+- [Bash aliases](raw/shell/aliases-bash.txt)
+- [Tool versions](raw/dev/tool-versions.txt)
+- [Global Git config](raw/dev/git-global.txt)
+- [npm globals](raw/dev/npm-global.txt)
+- [pnpm globals](raw/dev/pnpm-global.txt)
+- [Bun globals](raw/dev/bun-global.txt)
+- [Cargo-installed tools](raw/dev/cargo-install.txt)
+- [pipx tools](raw/dev/pipx.txt)
+- [Go environment](raw/dev/go-env.txt)
+- [Docker contexts](raw/dev/docker-contexts.txt)
+- [Kubernetes context names](raw/dev/kube-context-names.txt)
+
+## Power / laptop tuning
+
+- [power-profiles-daemon](raw/power/powerprofilesctl.txt)
+- [TLP](raw/power/tlp.txt)
+- [cpupower](raw/power/cpupower.txt)
+- Snapshot includes TLP, auto-cpufreq, keyd/interception/libinput configs when present.
+
+## Firewall / security
+
+- [nftables state](raw/security/nftables.txt)
+- [iptables state](raw/security/iptables.txt)
+- [UFW state](raw/security/ufw.txt)
+- [firewalld state](raw/security/firewalld.txt)
+- Snapshot includes safe firewall, sudoers, PAM/security and sshd configuration; host private keys are omitted.
+
+## Rebuilding dotfiles from this audit
+
+Recommended workflow:
+
+\`1.\` Create a fresh dotfiles branch/repo.  
+\`2.\` Review \`raw/packages/pacman-modified-backups.txt\` and \`raw/packages/etc-unowned.txt\`.  
+\`3.\` Copy only intentionally maintained files from \`snapshot$HOME/.config/...\` and selected \`snapshot/etc/...\`.  
+\`4.\` Turn the package lists into a bootstrap script (\`pacman -S --needed ...\` plus your AUR helper).  
+\`5.\` Turn enabled services into explicit \`systemctl enable ...\` / \`systemctl --user enable ...\` bootstrap steps.  
+\`6.\` Keep hardware- or machine-specific files (monitor EDIDs, hostnames, fstab UUIDs, network profiles) separate from portable dotfiles.  
+\`7.\` Never commit the whole audit directory blindly, especially after using \`--include-sensitive\`.
+EOF
+
+if [[ -n "$DOTFILES_DIR" ]]; then
+  cat >> "$REPORT" <<EOF
+
+## Existing dotfiles repo
+
+Repo: \`$DOTFILES_DIR\`
+
+- [Git status/remotes](raw/dotfiles/repo.txt)
+- [Symlinks resolving into the repo](raw/dotfiles/symlinks-into-repo.txt)
+
+EOF
+fi
+
+if (( FULL )); then
+  printf \
+    '\nFull pacman integrity scan (`pacman -Qkk`) was enabled.\n' \
+    >> "$REPORT"
+else
+  printf \
+    '\nFor a slower package integrity pass, re-run with `--full`.\n' \
+    >> "$REPORT"
+fi
+
+cat > "$OUT/compare-current.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(
+  cd "$(dirname "${BASH_SOURCE[0]}")"
+  pwd
+)"
+
+if [[ $# -ne 1 || "$1" != /* ]]; then
+  echo "Usage: $0 /absolute/path/to/config" >&2
+  exit 2
+fi
+
+snap="$ROOT/snapshot$1"
+
+if [[ ! -e "$snap" && ! -L "$snap" ]]; then
+  echo "Not found in snapshot: $snap" >&2
+  exit 1
+fi
+
+diff \
+  -u \
+  -- \
+  "$snap" \
+  "$1" ||
+  true
+EOF
+
+chmod +x "$OUT/compare-current.sh"
+
+if have tar; then
+  (
+    cd "$OUTPUT_BASE"
+
+    tar \
+      -czf "${HOST}-${STAMP}.tar.gz" \
+      "${HOST}-${STAMP}"
+  ) 2>>"$ERRORS" || true
+fi
+
+log "Done."
+
+printf '\nReport:   %s\n' "$REPORT"
+printf 'Snapshot: %s\n' "$SNAPSHOT"
+printf 'Manifest: %s\n' "$MANIFEST"
+
+if [[ -f "${OUTPUT_BASE%/}/${HOST}-${STAMP}.tar.gz" ]]; then
+  printf \
+    'Archive:  %s\n' \
+    "${OUTPUT_BASE%/}/${HOST}-${STAMP}.tar.gz"
+fi
+
+printf '\nReview REPORT.md first. Do not commit the audit directory wholesale.\n'
