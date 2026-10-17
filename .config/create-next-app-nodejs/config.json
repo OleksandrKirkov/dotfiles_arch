@@ -1,16 +1,17 @@
 {
-  "preferences": {
-    "typescript": true,
-    "eslint": false,
-    "tailwind": true,
-    "srcDir": false,
-    "app": true,
-    "turbopack": false,
-    "importAlias": "@/*",
-    "linter": "eslint",
-    "customizeImportAlias": false,
-    "empty": false,
-    "disableGit": false,
-    "reactCompiler": false
-  }
+	"preferences": {
+		"typescript": true,
+		"eslint": true,
+		"tailwind": false,
+		"srcDir": false,
+		"app": true,
+		"turbopack": false,
+		"importAlias": "@/*",
+		"linter": "eslint",
+		"customizeImportAlias": false,
+		"empty": false,
+		"disableGit": false,
+		"reactCompiler": false,
+		"agentsMd": true
+	}
 }
