@@ -5,9 +5,20 @@
 export ZSH="$HOME/.oh-my-zsh"
 export PATH="$PATH:$HOME/go/bin"
 
-export JAVA_HOME=/usr/lib/jvm/java-25-openjdk
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
 export PATH="$JAVA_HOME/bin:$PATH"
 export PATH="$HOME/.npm-global/bin:$PATH"
+[ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"
+
+export ANDROID_HOME="$HOME/Android/Sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
+
+export PATH="/opt/android-sdk/cmdline-tools/latest/bin:$PATH"
+export PATH="$ANDROID_HOME/platform-tools:$PATH"
+
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
 
 # Set name of the theme to load --- if set to "random", it will
 # load a random theme each time Oh My Zsh is loaded, in which case,
@@ -112,6 +123,21 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
+alias start_mongo="mongod --dbpath /var/lib/mongodb"
+alias start_arango="arangod --configuration none --server.endpoint tcp://127.0.0.1:8529 --database.directory /var/lib/arangodb3 --javascript.startup-directory /usr/share/arangodb3/js --javascript.app-path /var/lib/arangodb3-apps"
+alias start_arangosh="docker exec -t arangodb arangosh --server.password=password"
+start_sql_server() {
+    docker run -e "ACCEPT_EULA=Y" \
+        -e "MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:?set it in ~/.zshrc.local}" \
+        -p 1433:1433 \
+        --name sqlserver \
+        -v mssql_data:/var/opt/mssql \
+        -d mcr.microsoft.com/mssql/server:2022-latest
+}
+alias tgauth="yaauth telegram --config ~/develop/telegram.config.example.json"
+alias antigravity="~/.local/bin/agy"
+alias brave-browser="brave-flatpak"
+
 # pnpm
 export PNPM_HOME="/home/oleksandr/.local/share/pnpm"
 case ":$PATH:" in
@@ -164,3 +190,19 @@ echo -e "\e[0m"
 
 #ascii_banner
 
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# bun completions
+[ -s "/home/oleksandr/.bun/_bun" ] && source "/home/oleksandr/.bun/_bun"
+
+export BROWSER=brave-flatpak
+alias opentabletdriver="/usr/lib/opentabletdriver/OpenTabletDriver.UX.Gtk"
+export PATH="$PATH:/opt/mssql-tools18/bin"
+export PATH="$PATH:$HOME/.dotnet/tools"
+
+
+# Added by Antigravity CLI installer
+export PATH="/home/oleksandr/.local/bin:$PATH"
