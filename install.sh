@@ -28,6 +28,7 @@ PACMAN_PACKAGES=(
     git
     wget
     zip
+    unzip
     parallel
     jq
     fastfetch
@@ -35,11 +36,24 @@ PACMAN_PACKAGES=(
     stow
     flatpak
     eslint_d
+    gvfs
+    gvfs-mtp
+    gvfs-smb
+    wl-clipboard
+    power-profiles-daemon
+    webkit2gtk-4.1
+    file
+    openssl
+    appmenu-gtk-module
+    libappindicator-gtk3
+    librsvg
+    xdotool
 
     zsh
     ghostty
     neovim
     nano
+    ripgrep
 
     hyprland
     hypridle
@@ -83,7 +97,10 @@ PACMAN_PACKAGES=(
     ccls
     python-pynvim
     lazygit
-    python-pynvim
+    dotnet-sdk
+    dotnet-runtime
+    docker
+    docker-compose
 
     yazi
     discord
@@ -165,6 +182,19 @@ if [ ! -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]; then
     git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
 fi
 
+echo "Installing Rust..."
+if ! command -v rustc &>/dev/null; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+fi
+
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+rustup component add rust-src
+
+echo "Installing Bun..."
+if ! command -v bun &>/dev/null; then
+    curl -fsSL https://bun.sh/install | bash
+fi
+
 echo "Delete existing dotfiles..."
 
 CONFIG_DIR="$HOME/.config"
@@ -183,7 +213,7 @@ DIR=(
 )
 
 for dir in "${DIR[@]}"; do
-    if [ -f "$dir" ]; then
+    if [ -e "$dir" ] && [ ! -L "$dir" ]; then
         rm -r "$dir"
         echo "Delete dir: $dir"
     else
@@ -192,7 +222,6 @@ for dir in "${DIR[@]}"; do
 done
 
 echo "Setting up dotfiles with Stow..."
-sudo pacman -S --noconfirm stow
 cd ~/dotfiles_arch
 stow .
 

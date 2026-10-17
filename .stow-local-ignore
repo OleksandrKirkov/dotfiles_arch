@@ -2,3 +2,7 @@
 \.git
 ^/install.sh
 ^/.git-credentials
+^/\.gitignore
+^/\.stow-local-ignore
+^/packages
+^/systemd
