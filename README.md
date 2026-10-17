@@ -1,26 +1,24 @@
-# dotfiles
+# dotfiles_arch
 
 ## Installation
 
 ```sh
-git clone https://github.com/OleksandrKirkov/dotfiles.git
-cd ~/dotfiles
+git clone git@github.com:OleksandrKirkov/dotfiles_arch.git ~/dotfiles_arch
+cd ~/dotfiles_arch
+./install.sh
+```
+
+`install.sh` installs packages, removes existing configs, and links this repo into `~` with `stow .`.
+
+## Secrets
+
+Secrets are never tracked. Put them in `~/.zshrc.local` (sourced by `.zshrc`):
+
+```sh
+export ARTIFACTKEEPER_TOKEN=...
+export MSSQL_SA_PASSWORD=...
 ```
 
 ```sh
-chmod +x install.sh
-./install.sh 
-```
-
-```sh
-cp ~/dotfiles-arch/.zshrc ~/.zshrc
-```
-
-```sh
-cp -r ~/dotfiles-arch/.config/* ~/config 
-
-cp ~/dotfiles-arch/.gitconfig ~/.gitconfig
-cp ~/dotfiles-arch/.git-credentials ~/.git-credentials
-
-git config --global credential.helper store
+chmod 600 ~/.zshrc.local
 ```
