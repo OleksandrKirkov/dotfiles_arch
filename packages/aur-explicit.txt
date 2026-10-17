@@ -1,0 +1,10 @@
+android-sdk-cmdline-tools-latest
+figma-linux-next
+httptoolkit
+nbdkit
+opentabletdriver
+stylelint
+visual-studio-code-bin
+wlogout
+yay-bin
+yay-bin-debug

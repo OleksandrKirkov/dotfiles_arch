@@ -1,0 +1,8 @@
+opentabletdriver.service
+p11-kit-server.socket
+pipewire-pulse.service
+pipewire-pulse.socket
+pipewire.service
+pipewire.socket
+wireplumber.service
+xdg-user-dirs.service
