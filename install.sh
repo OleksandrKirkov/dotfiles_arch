@@ -48,6 +48,8 @@ PACMAN_PACKAGES=(
     libappindicator-gtk3
     librsvg
     xdotool
+    brightnessctl
+    playerctl
 
     zsh
     ghostty
@@ -61,6 +63,7 @@ PACMAN_PACKAGES=(
     hyprpaper
     hyprpicker
     hyprsunset
+    xdg-desktop-portal-hyprland
     waybar
     rofi
     wofi
