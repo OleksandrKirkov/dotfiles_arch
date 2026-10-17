@@ -1,87 +1,177 @@
 * {
-    border: none;
-    border-radius: 0;
-    min-height: 0;
-    margin: 0;
-    padding: 0;
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
 }
 
 #waybar {
-    background-color: rgba(1, 1, 1, 0.4);
-    color: #cdd6f4;
-    font-family: "JetBrainsMono Nerd Font";
-    font-size: 16px;
-    font-weight: bold;
+  background-color: #222222;
+  color: #cdd6f4;
+  font-family: "JetBrainsMono Nerd Font";
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 8px;
+}
+
+#custom-cpu_icon {
+  background-color: #282828;
+  margin: 8px 4px 0;
+  padding: 4px 6px 4px 10px;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  min-width: 0;
+}
+
+#custom-cpu_percent {
+  font-size: 12px;
+  background-color: #282828;
+  margin: 0 4px 0;
+  padding: 0 4px;
+}
+
+#custom-cpu_temp {
+  font-size: 12px;
+  background-color: #282828;
+  margin: 0 4px 8px;
+  padding: 4px 0px 4px 0px;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  min-width: 0;
+}
+
+#custom-mem_icon {
+  background-color: #282828;
+  margin: 8px 4px 0;
+  padding: 4px 0px 4px 0px;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  min-width: 0;
+}
+
+#custom-mem_percent {
+  font-size: 12px;
+  background-color: #282828;
+  margin: 0 4px 0;
+  padding: 0 4px;
+}
+
+#custom-mem_gb {
+  font-size: 12px;
+  background-color: #282828;
+  margin: 0 4px 8px;
+  padding: 4px 0px 4px 0px;
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
+  min-width: 0;
 }
 
 #clock,
-#cpu,
-#memory,
+#custom-cpu,
+#custom-memory,
 #pulseaudio,
-#language {
-    padding-left: 6px;
-    padding-right: 6px;
-    min-height: 0;
-    padding: 3px 10px;
-    border-radius: 7px;
-    margin: 1px 4px;
+#language,
+#battery,
+#backlight {
+  min-height: 0;
+  padding: 3px 10px;
+  margin: 1px 4px;
+}
+
+#network {
+  padding: 3px 8px;
+}
+
+#power-profiles-daemon {
+  padding: 3px 4px;
+}
+
+#backlight {
+  margin-left: 8px;
+}
+
+#custom-bluetooth {
+  padding: 3px 2px;
 }
 
 #clock {
-    font-weight: bold;
+  font-weight: bold;
+  background-color: #282828;
+  margin: 4px;
+  padding: 8px 0;
+  border-radius: 8px;
+  min-width: 0;
 }
 
 #cpu.warning {
-    color: orange;
+  color: orange;
 }
 
 #cpu.critical {
-    color: red;
+  color: red;
 }
 
 #memory {
-    animation-timing-function: linear;
-    animation-iteration-count: infinite;
-    animation-direction: alternate;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
 }
 
 #memory.warning {
-    color: orange;
+  color: orange;
 }
 
 #memory.critical {
-    color: red;
-    animation-name: blink-critical;
-    animation-duration: 2s;
+  color: red;
+  animation-name: blink-critical;
+  animation-duration: 2s;
 }
 
 #custom-power {
-    font-weight: bold;
+  font-weight: bold;
 }
 
 #custom-power:hover {
-    box-shadow: inherit;
-    text-shadow: inherit;
-    color: #1e1e2e;
+  box-shadow: inherit;
+  text-shadow: inherit;
+  color: #1e1e2e;
 }
 
 #window {
-    font-weight: bold;
+  font-weight: bold;
+}
+
+#workspaces {
+  background-color: #282828;
+  margin: 4px;
+  padding: 8px 0;
+  border-radius: 8px;
+  min-width: 0;
 }
 
 #workspaces button {
-  	padding-left: 6px;
-    padding-right: 10px;
-    margin: 1px 4px;
-    border-radius: 7px;
-    background-color:  #181825;
-    color: #cdd6f4;
-    font-size: 16px;
-    font-family: "JetBrainsMono Nerd Font";
-    font-weight: bold;
+  all: unset;
+  min-height: 28px;
+  /* padding-left: 6px; */
+  /* padding-right: 10px; */
+  padding-left: 1px;
+  padding-right: 4px;
+  margin: 4px;
+  border-radius: 7px;
+  color: #cdd6f4;
+  font-size: 16px;
+  font-family: "JetBrainsMono Nerd Font";
+  font-weight: bold;
+}
+#workspaces button:hover,
+#workspaces button:focus,
+#workspaces button:active,
+#workspaces button:checked {
+  background-color: #7a1b1b;
 }
 
 #workspaces button.active {
-  	background-color: #c5c8c6;
-    color: #1e1e2e;
+  background-color: #7a1b1b;
+  /* color: #cdd6f4; */
 }

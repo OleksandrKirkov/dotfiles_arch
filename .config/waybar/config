@@ -1,65 +1,159 @@
 {
-	"layer": "top",
-	"position": "top",
-	"height": 27,
-	"margin": 4,
-
-	"modules-left": ["cpu", "memory"],
-	"modules-center": ["hyprland/workspaces"],
-	"modules-right": ["tray", "pulseaudio", "hyprland/language", "battery",  "clock"],
-
-	"cpu": {
-		"format": "  {usage}%",
-		"tooltip": false
-	},
-
-	"memory": {
-		"format": "  {}%",
-		"tooltip": false
-	},
-
-	"hyprland/workspaces": {
-		"format": "{icon}",
-		"on-click": "activate",
-		"format-icons": {
-			"1": "",
-			"2": "",
-			"3": "",
-			"4": "",
-			"5": "",
-			"6": "",
-			"7": "",
-			},
-		"tooltip": false
-	},
-
-	"hyprland/language": {
-	  	"format": "{}",
-	  	"format-en": "EN",
-	  	"format-uk": "UA",
-	},
-
-	"tray": {
-		"icon-size": 16,
-		"spacing": 16
-	},
-
-    "battery": {
-        "format": "{icon}  {capacity}%",
-        "format-icons": ["", "", "", "", ""]
+  "layer": "top",
+  "position": "left",
+  "height": "100%",
+  "width": "24px",
+  "margin": 4,
+  "modules-left": [
+    "custom/cpu_icon",
+    "custom/cpu_percent",
+    "custom/cpu_temp",
+    // "custom/memory",
+    "custom/mem_icon",
+    "custom/mem_percent",
+    "custom/mem_gb"
+  ],
+  "modules-center": [
+    "hyprland/workspaces"
+  ],
+  "modules-right": [
+    "tray",
+    "backlight",
+    "pulseaudio",
+    "hyprland/language",
+    "custom/bluetooth",
+    "network",
+    "battery",
+    "power-profiles-daemon",
+    "clock"
+  ],
+  // "custom/cpu": {
+  //   "exec": "~/.local/bin/cpu_watts.sh",
+  //   "interval": 5,
+  //   "tooltip": false
+  // },
+  "custom/cpu_icon": {
+    "exec": "~/.local/bin/cpu_watts.sh icon",
+    "interval": 5
+  },
+  "custom/cpu_percent": {
+    "exec": "~/.local/bin/cpu_watts.sh percent",
+    "interval": 5
+  },
+  "custom/cpu_temp": {
+    "exec": "~/.local/bin/cpu_watts.sh temp",
+    "interval": 5
+  },
+  "network": {
+    // "format-wifi": " {essid}",
+    "format-wifi": " ",
+    // "format-ethernet": " {ifname}: {ipaddr}/{cidr}",
+    "format-ethernet": " ",
+    // "format-linked": " {ifname} (No IP)",
+    "format-linked": " ",
+    // "format-disconnected": "⚠ Disconnected",
+    "format-disconnected": "󰖪",
+    // "format-alt": "{ifname}: {ipaddr}/{cidr}"
+  },
+  "backlight": {
+    // "format": "{icon} {percent}%",
+    "format": "{icon}",
+    "format-icons": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]
+  },
+  "custom/bluetooth": {
+    "exec": "~/.local/bin/wofi-bluetooth --status",
+    "interval": 5,
+    "on-click": "~/.local/bin/wofi-bluetooth"
+  },
+  // "custom/memory": {
+  //   "exec": "~/.local/bin/memory_usage.sh",
+  //   "interval": 5,
+  //   "tooltip": "false"
+  // },
+  "custom/mem_icon": {
+    "exec": "~/.local/bin/memory_usage.sh icon",
+    "interval": 5
+  },
+  "custom/mem_percent": {
+    "exec": "~/.local/bin/memory_usage.sh percent",
+    "interval": 5
+  },
+  "custom/mem_gb": {
+    "exec": "~/.local/bin/memory_usage.sh gb",
+    "interval": 5
+  },
+  "hyprland/workspaces": {
+    "format": "{icon}",
+    "on-click": "activate",
+    "format-icons": {
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "󰎈",
+      "5": "",
+      "6": "󰏜",
+      "7": "",
     },
-
-	"clock": {
-		"tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
-		"format-alt": "{:%Y-%m-%d}"
-	},
-
-	"pulseaudio": {
-			"scroll-step": 5,
-			"format": "{icon}  {volume}%",
-			"format-icons": {
-				"default": ["", "", ""]
-			},
-			"on-click": "pavucontrol"
-	},
+    "tooltip": false
+  },
+  "hyprland/language": {
+    "format": "{}",
+    "format-en": "EN",
+    "format-uk": "UA",
+  },
+  "tray": {
+    "icon-size": 16,
+    "spacing": 16
+  },
+  "power-profiles-daemon": {
+    "format": "{icon}",
+    "tooltip-format": "Power profile: {profile}\nDriver: {driver}",
+    "tooltip": true,
+    "format-icons": {
+      "default": "",
+      "performance": "",
+      "balanced": "",
+      "power-saver": ""
+    }
+  },
+  "battery": {
+    // "format": "{icon}  {capacity}%",
+    "format": "{icon}",
+    "format-icons": [
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]
+  },
+  "clock": {
+    "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
+    "escape": "false",
+    "format-alt": "{:%Y-%m-%d}",
+    "format": "{:%H\n%M}"
+  },
+  "pulseaudio": {
+    "scroll-step": 5,
+    // "format": "{icon}  {volume}%",
+    "format": "{icon}",
+    "format-icons": {
+      "default": [
+        "",
+        "",
+        ""
+      ]
+    },
+    "on-click": "pavucontrol"
+  },
 }
