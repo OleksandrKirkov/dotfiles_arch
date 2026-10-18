@@ -1,9 +1,8 @@
--- Hyprland Lua config. Machine-specific monitors live in monitors.lua,
--- app choices in apps.lua, keybinds in binds.lua.
+-- Hyprland Lua config: shared defaults.
+-- App choices live in apps.lua, keybinds in binds.lua.
+-- Machine-specific settings and overrides live in user.lua, loaded last.
 
 local apps = require("apps")
-
-require("monitors")
 
 -- Autostart
 hl.on("hyprland.start", function()
@@ -87,3 +86,6 @@ hl.window_rule({
 })
 
 require("binds")
+
+-- Loaded last so machine-specific settings win.
+require("user")
