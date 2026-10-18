@@ -1,177 +1,161 @@
+/* Visual language adapted from Tsugumori (github.com/Aleph1-9012/Tsugumori, MIT):
+   flat charcoal rail, square corners, red activity, L-corner brackets on stats.
+   Layout, modules, and scripts are this repo's own (vertical left bar). */
+
+@define-color ts_bg #0a0a0a;
+@define-color ts_red #cc1515;
+@define-color ts_red_dim #9e1010;
+@define-color ts_text #e8e8e8;
+@define-color ts_muted #a29b96;
+@define-color ts_line rgba(204, 21, 21, 0.27);
+@define-color ts_stat_line rgba(204, 21, 21, 0.65);
+
 * {
+  font-family: "JetBrainsMono Nerd Font", monospace;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 0;
   border: none;
   border-radius: 0;
-  min-height: 0;
-  margin: 0;
   padding: 0;
+  margin: 0;
+  text-shadow: none;
+  box-shadow: none;
 }
 
-#waybar {
-  background-color: #222222;
-  color: #cdd6f4;
-  font-family: "JetBrainsMono Nerd Font";
-  font-size: 16px;
-  font-weight: bold;
-  border-radius: 8px;
+window#waybar {
+  background-color: @ts_bg;
+  border-right: 1px solid alpha(@ts_red, 0.4);
+  color: @ts_text;
 }
 
-#custom-cpu_icon {
-  background-color: #282828;
-  margin: 8px 4px 0;
-  padding: 4px 6px 4px 10px;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
-  min-width: 0;
-}
-
-#custom-cpu_percent {
-  font-size: 12px;
-  background-color: #282828;
-  margin: 0 4px 0;
-  padding: 0 4px;
-}
-
-#custom-cpu_temp {
-  font-size: 12px;
-  background-color: #282828;
-  margin: 0 4px 8px;
-  padding: 4px 0px 4px 0px;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-  min-width: 0;
-}
-
+/* CPU and memory stacks: bracket top-left on the icon, bottom-right on the last row */
+#custom-cpu_icon,
 #custom-mem_icon {
-  background-color: #282828;
   margin: 8px 4px 0;
-  padding: 4px 0px 4px 0px;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
-  min-width: 0;
+  padding: 4px 0;
+  color: @ts_red;
+  background-image:
+    linear-gradient(@ts_stat_line, @ts_stat_line),
+    linear-gradient(@ts_stat_line, @ts_stat_line);
+  background-size: 5px 1px, 1px 5px;
+  background-position: left top, left top;
+  background-repeat: no-repeat;
 }
 
+#custom-cpu_percent,
 #custom-mem_percent {
-  font-size: 12px;
-  background-color: #282828;
-  margin: 0 4px 0;
-  padding: 0 4px;
+  font-size: 11px;
+  margin: 0 4px;
+  padding: 0 2px;
 }
 
+#custom-cpu_temp,
 #custom-mem_gb {
-  font-size: 12px;
-  background-color: #282828;
+  font-size: 11px;
+  color: @ts_muted;
   margin: 0 4px 8px;
-  padding: 4px 0px 4px 0px;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-  min-width: 0;
+  padding: 2px 0 4px;
+  background-image:
+    linear-gradient(@ts_stat_line, @ts_stat_line),
+    linear-gradient(@ts_stat_line, @ts_stat_line);
+  background-size: 5px 1px, 1px 5px;
+  background-position: right bottom, right bottom;
+  background-repeat: no-repeat;
 }
 
-#clock,
-#custom-cpu,
-#custom-memory,
-#pulseaudio,
-#language,
-#battery,
-#backlight {
-  min-height: 0;
-  padding: 3px 10px;
-  margin: 1px 4px;
-}
-
-#network {
-  padding: 3px 8px;
-}
-
-#power-profiles-daemon {
-  padding: 3px 4px;
-}
-
-#backlight {
-  margin-left: 8px;
-}
-
-#custom-bluetooth {
-  padding: 3px 2px;
-}
-
-#clock {
-  font-weight: bold;
-  background-color: #282828;
-  margin: 4px;
-  padding: 8px 0;
-  border-radius: 8px;
-  min-width: 0;
-}
-
-#cpu.warning {
-  color: orange;
-}
-
-#cpu.critical {
-  color: red;
-}
-
-#memory {
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-direction: alternate;
-}
-
-#memory.warning {
-  color: orange;
-}
-
-#memory.critical {
-  color: red;
-  animation-name: blink-critical;
-  animation-duration: 2s;
-}
-
-#custom-power {
-  font-weight: bold;
-}
-
-#custom-power:hover {
-  box-shadow: inherit;
-  text-shadow: inherit;
-  color: #1e1e2e;
-}
-
-#window {
-  font-weight: bold;
-}
-
+/* Workspaces */
 #workspaces {
-  background-color: #282828;
-  margin: 4px;
-  padding: 8px 0;
-  border-radius: 8px;
-  min-width: 0;
+  margin: 4px 0;
+  padding: 4px 0;
+  border-top: 1px solid @ts_line;
+  border-bottom: 1px solid @ts_line;
 }
 
 #workspaces button {
   all: unset;
   min-height: 28px;
-  /* padding-left: 6px; */
-  /* padding-right: 10px; */
-  padding-left: 1px;
-  padding-right: 4px;
-  margin: 4px;
-  border-radius: 7px;
-  color: #cdd6f4;
+  margin: 2px 4px;
+  padding: 0 4px 0 1px;
+  color: @ts_muted;
   font-size: 16px;
-  font-family: "JetBrainsMono Nerd Font";
-  font-weight: bold;
-}
-#workspaces button:hover,
-#workspaces button:focus,
-#workspaces button:active,
-#workspaces button:checked {
-  background-color: #7a1b1b;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
-#workspaces button.active {
-  background-color: #7a1b1b;
-  /* color: #cdd6f4; */
+#workspaces button:hover {
+  background-color: rgba(204, 21, 21, 0.13);
+  color: @ts_text;
+}
+
+#workspaces button.active,
+#workspaces button.active:hover {
+  background-color: @ts_red;
+  color: @ts_bg;
+}
+
+#workspaces button.urgent:not(.active) {
+  color: @ts_red;
+}
+
+/* Status icons */
+#tray,
+#backlight,
+#pulseaudio,
+#language,
+#custom-bluetooth,
+#network,
+#battery,
+#power-profiles-daemon {
+  padding: 3px 0;
+  margin: 1px 4px;
+  color: @ts_text;
+}
+
+#pulseaudio,
+#custom-bluetooth,
+#network,
+#power-profiles-daemon {
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+#pulseaudio:hover,
+#custom-bluetooth:hover,
+#network:hover,
+#power-profiles-daemon:hover {
+  background-color: @ts_red;
+  color: @ts_bg;
+}
+
+#pulseaudio.muted,
+#network.disconnected {
+  color: @ts_red;
+}
+
+#battery.warning:not(.charging) {
+  color: @ts_red;
+}
+
+#battery.critical:not(.charging) {
+  background-color: @ts_red;
+  color: @ts_bg;
+}
+
+/* Clock: solid red block */
+#clock {
+  margin: 4px;
+  padding: 8px 0;
+  font-weight: 600;
+  letter-spacing: 1px;
+  background-color: @ts_red;
+  color: @ts_bg;
+}
+
+tooltip {
+  background: @ts_bg;
+  border: 1px solid @ts_line;
+}
+
+tooltip label {
+  color: @ts_text;
+  padding: 6px 8px;
 }
