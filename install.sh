@@ -60,7 +60,7 @@ PACMAN_PACKAGES=(
     hyprland
     hypridle
     hyprlock
-    hyprpaper
+    awww
     hyprpicker
     hyprsunset
     xdg-desktop-portal-hyprland
@@ -227,6 +227,11 @@ done
 echo "Setting up dotfiles with Stow..."
 cd ~/dotfiles_arch
 stow .
+
+echo "Linking theme-switch and selecting the default theme..."
+mkdir -p "$HOME/.local/bin"
+[ -e "$HOME/.local/bin/theme-switch" ] || ln -s ../../dotfiles_arch/.local/bin/theme-switch "$HOME/.local/bin/theme-switch"
+"$HOME/dotfiles_arch/.local/bin/theme-switch" --apply
 
 echo "Removing empty directories..."
 find "$CONFIG_DIR" -type d -empty -delete
