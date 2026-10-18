@@ -27,10 +27,22 @@ hl.env("BROWSER", apps.browser)
 hl.env("FILE_MANAGER", apps.fileManagerGUI)
 
 hl.config({
+    -- Look and motion adapted from Tsugumori (github.com/Aleph1-9012/Tsugumori, MIT)
     general = {
-        border_size = 0,
+        border_size = 1,
         gaps_in     = 4,
         gaps_out    = 4,
+
+        col = {
+            active_border   = "rgba(cc1515ff)",
+            inactive_border = "rgba(1a1814aa)",
+        },
+    },
+
+    decoration = {
+        rounding = 0,
+        blur     = { enabled = false },
+        shadow   = { enabled = false },
     },
 
     input = {
@@ -45,7 +57,7 @@ hl.config({
     },
 
     animations = {
-        enabled = false,
+        enabled = true,
     },
 
     dwindle = {
@@ -61,6 +73,13 @@ hl.config({
         no_hardware_cursors = true,
     },
 })
+
+hl.curve("tsugumori", { type = "bezier", points = { { 0.4, 0 }, { 0.2, 1 } } })
+
+hl.animation({ leaf = "windows",    enabled = true, speed = 4, bezier = "tsugumori", style = "slide" })
+hl.animation({ leaf = "windowsOut", enabled = true, speed = 3, bezier = "tsugumori", style = "slide" })
+hl.animation({ leaf = "fade",       enabled = true, speed = 4, bezier = "tsugumori" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 5, bezier = "tsugumori", style = "slidevert" })
 
 hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
 
