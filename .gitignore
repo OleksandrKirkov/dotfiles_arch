@@ -1,6 +1,3 @@
 prod.*
 .git-credentials
 .zshrc.local
-.config/ngrok/
-.config/nextjs-nodejs/
-.config/turborepo/
