@@ -29,39 +29,65 @@ window#waybar {
   color: @ts_text;
 }
 
-/* CPU and memory stacks: bracket top-left on the icon, bottom-right on the last row */
-#custom-cpu_icon,
-#custom-mem_icon {
-  margin: 8px 4px 0;
-  padding: 4px 0;
-  color: @ts_red;
+/* CPU and memory stacks: bracket top-left on the first row, bottom-right on the last */
+#cpu,
+#temperature,
+#memory {
+  font-size: 11px;
+  margin: 0 4px;
+  padding: 2px 0;
+  background-repeat: no-repeat;
+}
+
+#cpu,
+#memory {
+  margin-top: 8px;
+  padding-top: 4px;
   background-image:
     linear-gradient(@ts_stat_line, @ts_stat_line),
     linear-gradient(@ts_stat_line, @ts_stat_line);
   background-size: 5px 1px, 1px 5px;
   background-position: left top, left top;
-  background-repeat: no-repeat;
 }
 
-#custom-cpu_percent,
-#custom-mem_percent {
-  font-size: 11px;
-  margin: 0 4px;
-  padding: 0 2px;
-}
-
-#custom-cpu_temp,
-#custom-mem_gb {
-  font-size: 11px;
+#temperature {
   color: @ts_muted;
-  margin: 0 4px 8px;
-  padding: 2px 0 4px;
+}
+
+#temperature,
+#memory {
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+}
+
+#temperature {
   background-image:
     linear-gradient(@ts_stat_line, @ts_stat_line),
     linear-gradient(@ts_stat_line, @ts_stat_line);
   background-size: 5px 1px, 1px 5px;
   background-position: right bottom, right bottom;
-  background-repeat: no-repeat;
+}
+
+/* Memory is one label, so it carries both corners */
+#memory {
+  background-image:
+    linear-gradient(@ts_stat_line, @ts_stat_line),
+    linear-gradient(@ts_stat_line, @ts_stat_line),
+    linear-gradient(@ts_stat_line, @ts_stat_line),
+    linear-gradient(@ts_stat_line, @ts_stat_line);
+  background-size: 5px 1px, 1px 5px, 5px 1px, 1px 5px;
+  background-position: left top, left top, right bottom, right bottom;
+}
+
+#cpu.warning,
+#memory.warning {
+  color: @ts_muted;
+}
+
+#cpu.critical,
+#memory.critical,
+#temperature.critical {
+  color: @ts_red;
 }
 
 /* Workspaces */

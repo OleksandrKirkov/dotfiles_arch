@@ -1,17 +1,11 @@
 {
   "layer": "top",
   "position": "left",
-  "height": "100%",
-  "width": "24px",
+  "width": 36,
   "margin": 4,
   "modules-left": [
-    "custom/cpu_icon",
-    "custom/cpu_percent",
-    "custom/cpu_temp",
-    // "custom/memory",
-    "custom/mem_icon",
-    "custom/mem_percent",
-    "custom/mem_gb"
+    "group/cpu-stack",
+    "group/mem-stack"
   ],
   "modules-center": [
     "hyprland/workspaces"
@@ -27,37 +21,67 @@
     "power-profiles-daemon",
     "clock"
   ],
-  // "custom/cpu": {
-  //   "exec": "~/.local/bin/cpu_watts.sh",
-  //   "interval": 5,
-  //   "tooltip": false
-  // },
-  "custom/cpu_icon": {
-    "exec": "~/.local/bin/cpu_watts.sh icon",
-    "interval": 5
+  "group/cpu-stack": {
+    "orientation": "inherit",
+    "modules": [
+      "cpu",
+      "temperature"
+    ]
   },
-  "custom/cpu_percent": {
-    "exec": "~/.local/bin/cpu_watts.sh percent",
-    "interval": 5
+  "group/mem-stack": {
+    "orientation": "inherit",
+    "modules": [
+      "memory"
+    ]
   },
-  "custom/cpu_temp": {
-    "exec": "~/.local/bin/cpu_watts.sh temp",
-    "interval": 5
+  "cpu": {
+    "interval": 5,
+    "format": "<span color='#cc1515'></span>\n{usage}%",
+    "states": {
+      "warning": 70,
+      "critical": 90
+    },
+    "justify": "center"
   },
-  "network": {
-    // "format-wifi": " {essid}",
-    "format-wifi": " ",
-    // "format-ethernet": " {ifname}: {ipaddr}/{cidr}",
-    "format-ethernet": " ",
-    // "format-linked": " {ifname} (No IP)",
-    "format-linked": " ",
-    // "format-disconnected": "⚠ Disconnected",
-    "format-disconnected": "󰖪",
-    // "format-alt": "{ifname}: {ipaddr}/{cidr}"
+  "temperature": {
+    "interval": 5,
+    "hwmon-path-abs": "/sys/devices/platform/coretemp.0/hwmon",
+    "input-filename": "temp1_input",
+    "critical-threshold": 90,
+    "format": "{temperatureC}°C",
+    "justify": "center"
+  },
+  "memory": {
+    "interval": 5,
+    "format": "<span color='#cc1515'></span>\n{percentage}%\n{used:0.0f}G",
+    "tooltip-format": "{used:0.1f}G / {total:0.1f}G",
+    "states": {
+      "warning": 75,
+      "critical": 90
+    },
+    "justify": "center"
+  },
+  "hyprland/workspaces": {
+    "format": "{icon}",
+    "on-click": "activate",
+    "tooltip": false,
+    "format-icons": {
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "󰎈",
+      "5": "",
+      "6": "󰏜",
+      "7": ""
+    }
+  },
+  "tray": {
+    "icon-size": 16,
+    "spacing": 16
   },
   "backlight": {
-    // "format": "{icon} {percent}%",
     "format": "{icon}",
+    "tooltip-format": "Brightness {percent}%",
     "format-icons": [
       "",
       "",
@@ -70,83 +94,9 @@
       ""
     ]
   },
-  "custom/bluetooth": {
-    "exec": "~/.local/bin/wofi-bluetooth --status",
-    "interval": 5,
-    "on-click": "~/.local/bin/wofi-bluetooth"
-  },
-  // "custom/memory": {
-  //   "exec": "~/.local/bin/memory_usage.sh",
-  //   "interval": 5,
-  //   "tooltip": "false"
-  // },
-  "custom/mem_icon": {
-    "exec": "~/.local/bin/memory_usage.sh icon",
-    "interval": 5
-  },
-  "custom/mem_percent": {
-    "exec": "~/.local/bin/memory_usage.sh percent",
-    "interval": 5
-  },
-  "custom/mem_gb": {
-    "exec": "~/.local/bin/memory_usage.sh gb",
-    "interval": 5
-  },
-  "hyprland/workspaces": {
-    "format": "{icon}",
-    "on-click": "activate",
-    "format-icons": {
-      "1": "",
-      "2": "",
-      "3": "",
-      "4": "󰎈",
-      "5": "",
-      "6": "󰏜",
-      "7": "",
-    },
-    "tooltip": false
-  },
-  "hyprland/language": {
-    "format": "{}",
-    "format-en": "EN",
-    "format-uk": "UA",
-  },
-  "tray": {
-    "icon-size": 16,
-    "spacing": 16
-  },
-  "power-profiles-daemon": {
-    "format": "{icon}",
-    "tooltip-format": "Power profile: {profile}\nDriver: {driver}",
-    "tooltip": true,
-    "format-icons": {
-      "default": "",
-      "performance": "",
-      "balanced": "",
-      "power-saver": ""
-    }
-  },
-  "battery": {
-    // "format": "{icon}  {capacity}%",
-    "format": "{icon}",
-    "format-icons": [
-      "",
-      "",
-      "",
-      "",
-      ""
-    ]
-  },
-  "clock": {
-    "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
-    "escape": "false",
-    "format-alt": "{:%Y-%m-%d}",
-    "format": "{:%H\n%M}"
-  },
   "pulseaudio": {
-    "scroll-step": 5,
-    // "format": "{icon}  {volume}%",
     "format": "{icon}",
+    "format-muted": "",
     "format-icons": {
       "default": [
         "",
@@ -154,6 +104,57 @@
         ""
       ]
     },
+    "tooltip-format": "Volume {volume}%",
+    "scroll-step": 5,
     "on-click": "pavucontrol"
   },
+  "hyprland/language": {
+    "format": "{}",
+    "format-en": "EN",
+    "format-uk": "UA"
+  },
+  "custom/bluetooth": {
+    "exec": "~/.local/bin/wofi-bluetooth --status",
+    "interval": 5,
+    "on-click": "~/.local/bin/wofi-bluetooth"
+  },
+  "network": {
+    "format-wifi": "",
+    "format-ethernet": "",
+    "format-linked": "",
+    "format-disconnected": "󰖪",
+    "tooltip-format-wifi": "{essid} ({signalStrength}%)\n{ipaddr}",
+    "tooltip-format-ethernet": "{ifname}\n{ipaddr}"
+  },
+  "battery": {
+    "format": "{icon}",
+    "format-icons": [
+      "",
+      "",
+      "",
+      "",
+      ""
+    ],
+    "tooltip-format": "{capacity}% · {timeTo}",
+    "states": {
+      "warning": 20,
+      "critical": 10
+    }
+  },
+  "power-profiles-daemon": {
+    "format": "{icon}",
+    "tooltip-format": "Power profile: {profile}\nDriver: {driver}",
+    "format-icons": {
+      "default": "",
+      "performance": "",
+      "balanced": "",
+      "power-saver": ""
+    }
+  },
+  "clock": {
+    "format": "{:%H\n%M}",
+    "format-alt": "{:%Y-%m-%d}",
+    "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
+    "justify": "center"
+  }
 }
