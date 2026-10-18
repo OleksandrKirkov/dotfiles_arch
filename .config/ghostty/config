@@ -17,8 +17,8 @@ font-size = 14
 # =========================
 # 🎨 COLORS
 # =========================
-# Palette lives in themes/tsugumori
-theme = tsugumori
+# Palette comes from the active theme (themes/<name>/ghostty), set by theme-switch
+theme = /home/oleksandr/.local/state/theme/current/ghostty
 
 # =========================
 # ⌨️ KEYBINDINGS

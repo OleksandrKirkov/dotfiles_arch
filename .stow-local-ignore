@@ -6,3 +6,4 @@
 ^/\.stow-local-ignore
 ^/packages
 ^/systemd
+^/themes

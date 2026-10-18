@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# theme-switch: switch the desktop theme with an animated wallpaper transition.
+#
+# Themes are folders under <dotfiles>/themes/<name>/ containing:
+#   theme.env      shell vars (wallpaper=...)
+#   hypr.lua       Hyprland border colours
+#   waybar.css     @define-color palette imported by waybar/style.css
+#   ghostty        Ghostty theme file
+#   btop.theme     btop theme
+#   hyprlock.conf  hyprlock colour variables
+#
+# The active theme is a symlink: ${XDG_STATE_HOME:-~/.local/state}/theme/current
+
+set -euo pipefail
+
+REPO="$(cd "$(dirname "$(readlink -f "$0")")/../.." && pwd)"
+THEMES="$REPO/themes"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/theme"
+CURRENT="$STATE/current"
+DURATION="${THEME_SWITCH_DURATION:-1.2}"
+
+usage() {
+    cat <<EOF
+Usage: theme-switch <name> | --pick | --next | --apply | --list | --current
+
+  <name>     Switch to themes/<name>
+  --pick     Choose a theme with wofi
+  --next     Switch to the next theme alphabetically
+  --apply    Re-apply the current theme (e.g. after login)
+  --list     List available themes
+  --current  Print the active theme
+EOF
+}
+
+die() { echo "theme-switch: $*" >&2; exit 1; }
+
+list_themes() {
+    find "$THEMES" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
+}
+
+current_theme() {
+    if [[ -L "$CURRENT" ]]; then basename "$(readlink "$CURRENT")"; fi
+}
+
+next_theme() {
+    local cur first="" found=0 t
+    cur="$(current_theme)"
+    while read -r t; do
+        [[ -z "$first" ]] && first="$t"
+        if (( found )); then echo "$t"; return; fi
+        [[ "$t" == "$cur" ]] && found=1
+    done < <(list_themes)
+    echo "$first"
+}
+
+# Grow the new wallpaper from the cursor on its monitor; other monitors grow
+# from the point on their edge nearest to the cursor.
+apply_wallpaper() {
+    local wallpaper="$1"
+    [[ -f "$wallpaper" ]] || { echo "theme-switch: wallpaper not found: $wallpaper" >&2; return 0; }
+    command -v awww >/dev/null || { echo "theme-switch: awww not installed, skipping wallpaper" >&2; return 0; }
+
+    if ! awww query >/dev/null 2>&1; then
+        awww-daemon >/dev/null 2>&1 &
+        for _ in $(seq 20); do awww query >/dev/null 2>&1 && break; sleep 0.1; done
+    fi
+
+    local cx cy
+    read -r cx cy < <(hyprctl cursorpos | tr -d ',')
+
+    local name x y w h scale fps px py pids=()
+    while read -r name x y w h scale fps; do
+        px=$(awk -v c="$cx" -v o="$x" -v s="$scale" -v w="$w" \
+            'BEGIN { p = int((c - o) * s); if (p < 0) p = 0; if (p > w - 1) p = w - 1; print p }')
+        py=$(awk -v c="$cy" -v o="$y" -v s="$scale" -v h="$h" \
+            'BEGIN { p = int((c - o) * s); if (p < 0) p = 0; if (p > h - 1) p = h - 1; print h - 1 - p }')
+        awww img -o "$name" "$wallpaper" \
+            --transition-type grow \
+            --transition-pos "$px,$py" \
+            --transition-duration "$DURATION" \
+            --transition-fps "$fps" &
+        pids+=("$!")
+    done < <(hyprctl monitors -j | jq -r \
+        '.[] | "\(.name) \(.x) \(.y) \(.width) \(.height) \(.scale) \([.refreshRate | round, 255] | min)"')
+
+    wait "${pids[@]}" 2>/dev/null || true
+}
+
+# Hyprland animates the border colour change itself.
+apply_hyprland() {
+    command -v hyprctl >/dev/null || return 0
+    hyprctl eval "
+        local t = dofile('$CURRENT/hypr.lua')
+        hl.config({ general = { col = {
+            active_border = t.active_border,
+            inactive_border = t.inactive_border,
+        } } })" >/dev/null || echo "theme-switch: hyprctl eval failed" >&2
+}
+
+reload_apps() {
+    pkill -USR2 -x waybar 2>/dev/null || true   # waybar: SIGUSR2 reloads config and style
+    pkill -USR2 -x ghostty 2>/dev/null || true  # ghostty (GTK): SIGUSR2 reloads config
+}
+
+link_btop() {
+    mkdir -p "$HOME/.config/btop/themes"
+    ln -sfn "$CURRENT/btop.theme" "$HOME/.config/btop/themes/current.theme"
+}
+
+name=""
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+    --list)    list_themes; exit 0 ;;
+    --current) current_theme; exit 0 ;;
+    --pick)    name="$(list_themes | wofi --dmenu --prompt Theme)" || exit 0 ;;
+    --next)    name="$(next_theme)" ;;
+    --apply)   name="$(current_theme)"; [[ -n "$name" ]] || name="$(list_themes | head -n1)" ;;
+    "")        usage >&2; exit 2 ;;
+    -*)        usage >&2; exit 2 ;;
+    *)         name="$1" ;;
+esac
+
+[[ -n "$name" ]] || exit 0
+[[ -d "$THEMES/$name" ]] || die "no such theme: $name (see --list)"
+
+mkdir -p "$STATE"
+ln -sfn "$THEMES/$name" "$CURRENT"
+link_btop
+
+wallpaper=""
+# shellcheck source=/dev/null
+source "$CURRENT/theme.env"
+
+apply_hyprland
+reload_apps
+apply_wallpaper "$wallpaper"
+
+command -v notify-send >/dev/null && notify-send -a theme-switch -t 1500 "Theme" "$name" || true
