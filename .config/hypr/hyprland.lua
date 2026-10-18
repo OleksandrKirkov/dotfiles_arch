@@ -4,6 +4,14 @@
 
 local apps = require("apps")
 
+-- Active theme (themes/<name>/hypr.lua via ~/.local/state/theme/current, set by theme-switch).
+-- Falls back to Tsugumori colours if no theme has been selected yet.
+local theme = { active_border = "rgba(cc1515ff)", inactive_border = "rgba(1a1814aa)" }
+do
+    local ok, t = pcall(dofile, os.getenv("HOME") .. "/.local/state/theme/current/hypr.lua")
+    if ok and type(t) == "table" then theme = t end
+end
+
 -- Autostart
 hl.on("hyprland.start", function()
     hl.exec_cmd(apps.terminal)
@@ -34,8 +42,8 @@ hl.config({
         gaps_out    = 4,
 
         col = {
-            active_border   = "rgba(cc1515ff)",
-            inactive_border = "rgba(1a1814aa)",
+            active_border   = theme.active_border,
+            inactive_border = theme.inactive_border,
         },
     },
 
@@ -79,6 +87,7 @@ hl.curve("tsugumori", { type = "bezier", points = { { 0.4, 0 }, { 0.2, 1 } } })
 hl.animation({ leaf = "windows",    enabled = true, speed = 4, bezier = "tsugumori", style = "slide" })
 hl.animation({ leaf = "windowsOut", enabled = true, speed = 3, bezier = "tsugumori", style = "slide" })
 hl.animation({ leaf = "fade",       enabled = true, speed = 4, bezier = "tsugumori" })
+hl.animation({ leaf = "border",     enabled = true, speed = 8, bezier = "tsugumori" })
 hl.animation({ leaf = "workspaces", enabled = true, speed = 5, bezier = "tsugumori", style = "slidevert" })
 
 hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
