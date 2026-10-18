@@ -59,6 +59,7 @@ apply_wallpaper() {
     local wallpaper="$1"
     [[ -f "$wallpaper" ]] || { echo "theme-switch: wallpaper not found: $wallpaper" >&2; return 0; }
     command -v awww >/dev/null || { echo "theme-switch: awww not installed, skipping wallpaper" >&2; return 0; }
+    [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || return 0
 
     if ! awww query >/dev/null 2>&1; then
         awww-daemon >/dev/null 2>&1 &
@@ -88,7 +89,7 @@ apply_wallpaper() {
 
 # Hyprland animates the border colour change itself.
 apply_hyprland() {
-    command -v hyprctl >/dev/null || return 0
+    [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || return 0
     hyprctl eval "
         local t = dofile('$CURRENT/hypr.lua')
         hl.config({ general = { col = {
