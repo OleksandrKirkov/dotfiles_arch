@@ -24,6 +24,7 @@
   "group/cpu-stack": {
     "orientation": "inherit",
     "modules": [
+      "custom/cpu_icon",
       "cpu",
       "temperature"
     ]
@@ -31,12 +32,13 @@
   "group/mem-stack": {
     "orientation": "inherit",
     "modules": [
+      "custom/memory_icon",
       "memory"
     ]
   },
   "cpu": {
     "interval": 5,
-    "format": "<span color='#cc1515'></span>\n{usage}%",
+    "format": "{usage}%",
     "states": {
       "warning": 70,
       "critical": 90
@@ -53,7 +55,7 @@
   },
   "memory": {
     "interval": 5,
-    "format": "<span color='#cc1515'></span>\n{percentage}%\n{used:0.0f}G",
+    "format": "{percentage}%\n{used:0.0f}G",
     "tooltip-format": "{used:0.1f}G / {total:0.1f}G",
     "states": {
       "warning": 75,
@@ -156,5 +158,13 @@
     "format-alt": "{:%Y-%m-%d}",
     "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
     "justify": "center"
+  },
+  "custom/cpu_icon": {
+    "format": "",
+    "tooltip": false
+  },
+  "custom/memory_icon": {
+    "format": "",
+    "tooltip": false
   }
 }
