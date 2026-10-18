@@ -8,6 +8,10 @@
 #   ghostty        Ghostty theme file
 #   btop.theme     btop theme
 #   hyprlock.conf  hyprlock colour variables
+#   nvim           NvChad base46 theme name
+#
+# Any NvChad base46 theme can be picked: the first time, theme-gen builds its
+# package from nvim's palette into themes/<name>/.
 #
 # The active theme is a symlink: ${XDG_STATE_HOME:-~/.local/state}/theme/current
 
@@ -18,17 +22,19 @@ THEMES="$REPO/themes"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/theme"
 CURRENT="$STATE/current"
 DURATION="${THEME_SWITCH_DURATION:-1.2}"
+NVIM_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
+BASE46_THEMES="${XDG_DATA_HOME:-$HOME/.local/share}/nvim/lazy/base46/lua/base46/themes"
 
 usage() {
     cat <<EOF
-Usage: theme-switch <name> | --pick | --next | --apply | --list | --current
+Usage: theme-switch <name> | --pick | --next | --apply | --list [--all] | --current
 
-  <name>     Switch to themes/<name>
-  --pick     Choose a theme with wofi
-  --next     Switch to the next theme alphabetically
-  --apply    Re-apply the current theme (e.g. after login)
-  --list     List available themes
-  --current  Print the active theme
+  <name>       Switch to a theme (any base46 theme is generated on first use)
+  --pick       Choose from all themes with wofi
+  --next       Switch to the next installed theme alphabetically
+  --apply      Re-apply the current theme (e.g. after login)
+  --list       List installed themes (themes/<name>/); --all adds every base46 theme
+  --current    Print the active theme
 EOF
 }
 
@@ -36,6 +42,45 @@ die() { echo "theme-switch: $*" >&2; exit 1; }
 
 list_themes() {
     find "$THEMES" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
+}
+
+# Installed packages plus every base46 theme and custom NvChad theme.
+all_themes() {
+    {
+        list_themes
+        for d in "$BASE46_THEMES" "$NVIM_CONFIG/lua/themes"; do
+            [[ -d "$d" ]] && find "$d" -maxdepth 1 -name '*.lua' -printf '%f\n' | sed 's/\.lua$//'
+        done
+    } | sort -u
+}
+
+# Build themes/<name>/ from nvim's palette, inheriting the current wallpaper.
+generate_theme() {
+    local name="$1" wallpaper=""
+    if [[ -f "$CURRENT/theme.env" ]]; then
+        # shellcheck source=/dev/null
+        wallpaper="$(source "$CURRENT/theme.env"; echo "${wallpaper:-}")"
+    fi
+    "$REPO/.local/bin/theme-gen" "$name" "$THEMES/$name" "$wallpaper"
+}
+
+# Recolour every running nvim; if none is running, rebuild the base46 cache so the
+# next nvim starts in the new theme.
+apply_nvim() {
+    local name="$1" sock reloaded=0
+    command -v nvim >/dev/null || return 0
+    [[ -n "$name" ]] || return 0
+    for sock in "${XDG_RUNTIME_DIR:-/tmp}"/nvim.*; do
+        [[ -S "$sock" ]] || continue
+        if timeout 3 nvim --server "$sock" --remote-expr \
+            "luaeval('pcall(require(\"nvchad.themes.utils\").reload_theme, \"$name\")')" >/dev/null 2>&1; then
+            reloaded=1
+        fi
+    done
+    if (( ! reloaded )); then
+        (timeout 20 nvim --headless "+lua pcall(function() require('base46').load_all_highlights() end)" +qa \
+            >/dev/null 2>&1 &)
+    fi
 }
 
 current_theme() {
@@ -111,9 +156,9 @@ link_btop() {
 name=""
 case "${1:-}" in
     -h|--help) usage; exit 0 ;;
-    --list)    list_themes; exit 0 ;;
+    --list)    if [[ "${2:-}" == "--all" ]]; then all_themes; else list_themes; fi; exit 0 ;;
     --current) current_theme; exit 0 ;;
-    --pick)    name="$(list_themes | wofi --dmenu --prompt Theme)" || exit 0 ;;
+    --pick)    name="$(all_themes | wofi --dmenu --prompt Theme)" || exit 0 ;;
     --next)    name="$(next_theme)" ;;
     --apply)   name="$(current_theme)"; [[ -n "$name" ]] || name="$(list_themes | head -n1)" ;;
     "")        usage >&2; exit 2 ;;
@@ -122,7 +167,11 @@ case "${1:-}" in
 esac
 
 [[ -n "$name" ]] || exit 0
-[[ -d "$THEMES/$name" ]] || die "no such theme: $name (see --list)"
+[[ "$name" =~ ^[A-Za-z0-9_-]+$ ]] || die "invalid theme name: $name"
+if [[ ! -d "$THEMES/$name" ]]; then
+    all_themes | grep -qx -- "$name" || die "no such theme: $name (see --list --all)"
+    generate_theme "$name" >/dev/null || die "could not generate theme: $name"
+fi
 
 mkdir -p "$STATE"
 ln -sfn "$THEMES/$name" "$CURRENT"
@@ -132,8 +181,12 @@ wallpaper=""
 # shellcheck source=/dev/null
 source "$CURRENT/theme.env"
 
+nvim_theme=""
+[[ -f "$CURRENT/nvim" ]] && nvim_theme="$(head -n1 "$CURRENT/nvim")"
+
 apply_hyprland
 reload_apps
+apply_nvim "$nvim_theme"
 apply_wallpaper "$wallpaper"
 
 command -v notify-send >/dev/null && notify-send -a theme-switch -t 1500 "Theme" "$name" || true
