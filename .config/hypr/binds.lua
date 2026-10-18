@@ -24,7 +24,9 @@ bind(mainMod .. " + D",         exec(apps.menu))
 bind(mainMod .. " + O",         exec("obsidian"))
 bind(mainMod .. " + M",         exec("waybar"))
 bind(mainMod .. " + N",         exec("killall waybar"))
-bind(mainMod .. " + T",         exec("pkill -x hyprpaper; hyprpaper"))
+local themeSwitch = os.getenv("HOME") .. "/.local/bin/theme-switch"
+bind(mainMod .. " + T",         exec(themeSwitch .. " --apply"))
+bind(mainMod .. " + SHIFT + T", exec(themeSwitch .. " --pick"))
 bind(mainMod .. " + Escape",    exec("loginctl lock-session"))
 bind("ALT + S",                 exec('grim -g "$(slurp)" - | wl-copy'))
 
