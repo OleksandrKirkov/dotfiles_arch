@@ -35,6 +35,15 @@ window#waybar {
   background-repeat: no-repeat;
 }
 
+/* Custom modules wrap their label in a non-expanding box (Waybar AIconLabel),
+   so the label shrinks to the glyph and sits left. Stretch it to the module
+   width (36px bar - 1px border - 2x4px margin); "align": 0.5 centres the text. */
+#custom-cpu_icon label,
+#custom-memory_icon label,
+#custom-bluetooth label {
+  min-width: 27px;
+}
+
 #custom-cpu_icon,
 #custom-memory_icon {
   color: @accent;

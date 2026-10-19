@@ -65,7 +65,6 @@
   },
   "hyprland/workspaces": {
     "format": "{icon}",
-    "on-click": "activate",
     "tooltip": false,
     "format-icons": {
       "1": "",
@@ -116,6 +115,7 @@
     "format-uk": "UA"
   },
   "custom/bluetooth": {
+    "align": 0.5,
     "exec": "~/.local/bin/wofi-bluetooth --status",
     "interval": 5,
     "on-click": "~/.local/bin/wofi-bluetooth"
@@ -160,10 +160,12 @@
     "justify": "center"
   },
   "custom/cpu_icon": {
+    "align": 0.5,
     "format": "",
     "tooltip": false
   },
   "custom/memory_icon": {
+    "align": 0.5,
     "format": "",
     "tooltip": false
   }
