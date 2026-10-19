@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# system-alerts: desktop notifications for low battery and high RAM usage.
+#
+# Polls sysfs and /proc/meminfo; fires one critical notification per threshold
+# crossing and re-arms once the value recovers. Started from hyprland.lua.
+#
+# Env overrides:
+#   BATTERY_LOW_PERCENT   notify when discharging below this (default 10)
+#   RAM_HIGH_GIB          notify when used RAM exceeds this many GiB (default 28)
+#   ALERT_INTERVAL        poll interval in seconds (default 30)
+
+set -u
+
+BATTERY_LOW_PERCENT="${BATTERY_LOW_PERCENT:-10}"
+RAM_HIGH_GIB="${RAM_HIGH_GIB:-28}"
+ALERT_INTERVAL="${ALERT_INTERVAL:-30}"
+
+# Single instance per session.
+lock="${XDG_RUNTIME_DIR:-/tmp}/system-alerts.lock"
+exec 9>"$lock"
+flock -n 9 || exit 0
+
+battery_dir=""
+for dir in /sys/class/power_supply/BAT*; do
+    [ -r "$dir/capacity" ] && battery_dir="$dir" && break
+done
+
+battery_alerted=0
+ram_alerted=0
+
+check_battery() {
+    [ -n "$battery_dir" ] || return 0
+    local capacity status
+    capacity=$(<"$battery_dir/capacity")
+    status=$(<"$battery_dir/status")
+
+    if [ "$status" = "Discharging" ] && [ "$capacity" -lt "$BATTERY_LOW_PERCENT" ]; then
+        if [ "$battery_alerted" -eq 0 ]; then
+            notify-send -u critical -a system-alerts -i battery-caution \
+                "Low battery" "${capacity}% left. Plug in the charger."
+            battery_alerted=1
+        fi
+    else
+        battery_alerted=0
+    fi
+}
+
+check_ram() {
+    local total available used_kib limit_kib
+    total=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+    available=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+    used_kib=$((total - available))
+    limit_kib=$((RAM_HIGH_GIB * 1024 * 1024))
+
+    if [ "$used_kib" -gt "$limit_kib" ]; then
+        if [ "$ram_alerted" -eq 0 ]; then
+            local used_gib
+            used_gib=$(awk -v k="$used_kib" 'BEGIN { printf "%.1f", k / 1024 / 1024 }')
+            notify-send -u critical -a system-alerts -i dialog-warning \
+                "High RAM usage" "${used_gib} GiB in use (limit ${RAM_HIGH_GIB} GiB)."
+            ram_alerted=1
+        fi
+    else
+        ram_alerted=0
+    fi
+}
+
+while :; do
+    check_battery
+    check_ram
+    sleep "$ALERT_INTERVAL"
+done
