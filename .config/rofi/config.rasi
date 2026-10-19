@@ -1,0 +1,17 @@
+configuration {
+    modi:                "drun,run,window";
+    show-icons:          true;
+    terminal:            "ghostty";
+    drun-display-format: "{name}";
+    display-drun:        "apps";
+    display-run:         "run";
+    display-window:      "windows";
+    matching:            "fuzzy";
+    sort:                true;
+    sorting-method:      "fzf";
+    hover-select:        true;
+    me-select-entry:     "";
+    me-accept-entry:     "MousePrimary";
+}
+
+@theme "~/.config/rofi/theme.rasi"

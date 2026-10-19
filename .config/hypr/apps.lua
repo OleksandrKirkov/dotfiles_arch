@@ -6,5 +6,5 @@ return {
     browser             = "flatpak run com.brave.Browser",
     fileManagerTerminal = terminal .. " -e yazi",
     fileManagerGUI      = "nautilus",
-    menu                = "wofi --show drun",
+    menu                = "rofi -show drun",
 }

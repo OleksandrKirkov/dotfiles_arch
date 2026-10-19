@@ -1,10 +1,132 @@
+/* Layout only. Colours come from the active theme package (theme-switch):
+ * ~/.local/state/theme/current/rofi.rasi defines bg, bg-alt, accent,
+ * accent-dim, fg, muted, urgent. Rofi reads it at every launch. */
+
 * {
-    main-bg:            #11111be6;
-    main-fg:            #cdd6f4ff;
-    main-br:            #cba6f7ff;
-    main-ex:            #f5e0dcff;
-    select-bg:          #b4befeff;
-    select-fg:          #11111bff;
-    separatorcolor:     transparent;
-    border-color:       transparent;
+    bg:         #0a0a0af2;
+    bg-alt:     #1a1814;
+    accent:     #cc1515;
+    accent-dim: #9e1010;
+    fg:         #e8e8e8;
+    muted:      #a29b96;
+    urgent:     #cc1515;
+}
+
+@import "~/.local/state/theme/current/rofi.rasi"
+
+* {
+    font:             "JetBrainsMono Nerd Font Propo 12";
+    background-color: transparent;
+    text-color:       @fg;
+    margin:           0;
+    padding:          0;
+    spacing:          0;
+}
+
+window {
+    width:            560px;
+    location:         center;
+    background-color: @bg;
+    border:           1px;
+    border-color:     @accent;
+    border-radius:    0;
+}
+
+mainbox {
+    padding:  12px;
+    spacing:  10px;
+    children: [ inputbar, message, listview, mode-switcher ];
+}
+
+inputbar {
+    padding:          8px 10px;
+    spacing:          10px;
+    background-color: @bg-alt;
+    border:           0 0 1px 0;
+    border-color:     @accent-dim;
+    children:         [ prompt, entry ];
+}
+
+prompt {
+    text-color: @accent;
+}
+
+entry {
+    placeholder:       "search";
+    placeholder-color: @muted;
+    cursor:            text;
+}
+
+message {
+    padding:          8px 10px;
+    background-color: @bg-alt;
+}
+
+textbox {
+    text-color: @fg;
+}
+
+listview {
+    lines:        8;
+    columns:      1;
+    fixed-height: true;
+    scrollbar:    false;
+    cycle:        true;
+    spacing:      2px;
+}
+
+element {
+    padding:     7px 10px;
+    spacing:     10px;
+    border:      0 0 0 2px;
+    border-color: transparent;
+    cursor:      pointer;
+}
+
+element normal.normal,
+element alternate.normal {
+    text-color: @fg;
+}
+
+element selected.normal {
+    background-color: @bg-alt;
+    border-color:     @accent;
+    text-color:       @accent;
+}
+
+element normal.urgent,
+element alternate.urgent,
+element selected.urgent {
+    text-color: @urgent;
+}
+
+element normal.active,
+element alternate.active {
+    text-color: @accent-dim;
+}
+
+element-icon {
+    size:   20px;
+    cursor: inherit;
+}
+
+element-text {
+    text-color:     inherit;
+    vertical-align: 0.5;
+    cursor:         inherit;
+}
+
+mode-switcher {
+    spacing: 4px;
+}
+
+button {
+    padding:    5px;
+    text-color: @muted;
+    cursor:     pointer;
+}
+
+button selected {
+    background-color: @bg-alt;
+    text-color:       @accent;
 }
