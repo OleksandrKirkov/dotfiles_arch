@@ -1,0 +1,7 @@
+@define-color bg #0c0e0f;
+@define-color accent #6791C9;
+@define-color accent_dim #1f2122;
+@define-color text #edeff0;
+@define-color muted #3e4041;
+@define-color line rgba(103, 145, 201, 0.27);
+@define-color stat_line rgba(103, 145, 201, 0.65);
