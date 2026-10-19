@@ -1,0 +1,10 @@
+/* Tsugumori: matches waybar.css. */
+* {
+    bg:         #0a0a0af2;
+    bg-alt:     #1a1814;
+    accent:     #cc1515;
+    accent-dim: #9e1010;
+    fg:         #e8e8e8;
+    muted:      #a29b96;
+    urgent:     #cc1515;
+}

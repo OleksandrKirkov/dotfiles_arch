@@ -5,6 +5,7 @@
 #   theme.env      shell vars (wallpaper=...)
 #   hypr.lua       Hyprland border colours
 #   waybar.css     @define-color palette imported by waybar/style.css
+#   rofi.rasi      colour variables imported by rofi/theme.rasi
 #   ghostty        Ghostty theme file
 #   btop.theme     btop theme
 #   hyprlock.conf  hyprlock colour variables
@@ -30,7 +31,7 @@ usage() {
 Usage: theme-switch <name> | --pick | --next | --apply | --list [--all] | --current
 
   <name>       Switch to a theme (any base46 theme is generated on first use)
-  --pick       Choose from all themes with wofi
+  --pick       Choose from all themes with rofi
   --next       Switch to the next installed theme alphabetically
   --apply      Re-apply the current theme (e.g. after login)
   --list       List installed themes (themes/<name>/); --all adds every base46 theme
@@ -67,6 +68,37 @@ generate_theme() {
         wallpaper="$(source "$CURRENT/theme.env"; echo "${wallpaper:-}")"
     fi
     "$REPO/.local/bin/theme-gen" "$name" "$THEMES/$name" "$wallpaper"
+}
+
+# Themes built before a new app was themed lack its file: generate the missing
+# files only, never overwriting what is already there (hand-made themes stay as is).
+backfill_theme() {
+    local dir="$1" name wallpaper="" tmp f missing=0
+    for f in theme.env hypr.lua waybar.css rofi.rasi ghostty btop.theme hyprlock.conf; do
+        [[ -e "$dir/$f" ]] || missing=1
+    done
+    (( missing )) || return 0
+    name="$(head -n1 "$dir/nvim" 2>/dev/null)" || return 0
+    [[ -n "$name" ]] || return 0
+    if [[ -f "$dir/theme.env" ]]; then
+        # shellcheck source=/dev/null
+        wallpaper="$(source "$dir/theme.env"; echo "${wallpaper:-}")"
+    fi
+    tmp="$(mktemp -d)"
+    if "$REPO/.local/bin/theme-gen" "$name" "$tmp" "$wallpaper" >/dev/null; then
+        for f in "$tmp"/*; do
+            [[ -e "$dir/${f##*/}" ]] || cp -- "$f" "$dir/"
+        done
+    fi
+    rm -rf -- "$tmp"
+}
+
+pick_theme() {
+    if command -v rofi >/dev/null; then
+        rofi -dmenu -i -p Theme -select "$(current_theme)"
+    else
+        wofi --dmenu --prompt Theme
+    fi
 }
 
 # Recolour every running nvim; if none is running, rebuild the base46 cache so the
@@ -163,7 +195,7 @@ case "${1:-}" in
     -h|--help) usage; exit 0 ;;
     --list)    if [[ "${2:-}" == "--all" ]]; then all_themes; else list_themes; fi; exit 0 ;;
     --current) current_theme; exit 0 ;;
-    --pick)    name="$(all_themes | wofi --dmenu --prompt Theme)" || exit 0 ;;
+    --pick)    name="$(all_themes | pick_theme)" || exit 0 ;;
     --next)    name="$(next_theme)" ;;
     --apply)   name="$(current_theme)"; [[ -n "$name" ]] || name="$(list_themes | head -n1)" ;;
     "")        usage >&2; exit 2 ;;
@@ -177,6 +209,7 @@ if [[ ! -d "$THEMES/$name" ]]; then
     all_themes | grep -qx -- "$name" || die "no such theme: $name (see --list --all)"
     generate_theme "$name" >/dev/null || die "could not generate theme: $name"
 fi
+backfill_theme "$THEMES/$name"
 
 mkdir -p "$STATE"
 ln -sfn "$THEMES/$name" "$CURRENT"
