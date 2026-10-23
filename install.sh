@@ -40,6 +40,7 @@ PACMAN_PACKAGES=(
     gvfs-mtp
     gvfs-smb
     wl-clipboard
+    cliphist
     power-profiles-daemon
     webkit2gtk-4.1
     file

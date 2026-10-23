@@ -21,6 +21,9 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("command -v awww-daemon >/dev/null && awww-daemon || hyprpaper")
     hl.exec_cmd("Telegram")
     hl.exec_cmd("hypridle")
+    -- clipboard history for SUPER + SHIFT + V
+    hl.exec_cmd("wl-paste --type text --watch cliphist store")
+    hl.exec_cmd("wl-paste --type image --watch cliphist store")
     -- low battery (<10%) and high RAM (>28 GiB) notifications
     hl.exec_cmd("$HOME/dotfiles_arch/.local/bin/system-alerts")
 end)

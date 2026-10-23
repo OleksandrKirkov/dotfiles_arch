@@ -7,4 +7,5 @@ return {
     fileManagerTerminal = terminal .. " -e yazi",
     fileManagerGUI      = "nautilus",
     menu                = "rofi -show drun",
+    clipboard           = "cliphist list | rofi -dmenu -p clipboard | cliphist decode | wl-copy",
 }
