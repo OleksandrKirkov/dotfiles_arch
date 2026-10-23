@@ -12,14 +12,49 @@ do
     if ok and type(t) == "table" then theme = t end
 end
 
+-- Startup placement: the first window of each app lands on its workspace.
+-- Matched by class through window events, not exec_cmd rules: those track the
+-- spawned PID, which flatpak forks away from, and Spotify sets its class only
+-- after the window maps. Later windows of the same app open normally.
+local startup_workspaces = {
+    { class = "^org%.telegram%.desktop$", workspace = 5 },
+    { class = "^[Ss]potify$",             workspace = 1 },
+    { class = "^brave%-browser$",         workspace = 3 },
+}
+local STARTUP_PLACEMENT_MS = 120000 -- give up after 2 min (slow flatpak cold start)
+
+local function place_startup_window(w)
+    -- window.class can fire before the window maps (no workspace yet); a move
+    -- then is a no-op, so wait for the mapped event.
+    if not w or not w.class or not w.workspace then return end
+    for _, entry in ipairs(startup_workspaces) do
+        if not entry.placed and w.class:match(entry.class) then
+            entry.placed = true
+            if w.workspace.id ~= entry.workspace then
+                hl.dispatch(hl.dsp.window.move({ workspace = entry.workspace, follow = false, window = w }))
+            end
+            return
+        end
+    end
+end
+
 -- Autostart
 hl.on("hyprland.start", function()
+    local subs = {
+        hl.on("window.open", place_startup_window),
+        hl.on("window.class", place_startup_window),
+    }
+    hl.timer(function()
+        for _, sub in ipairs(subs) do sub:remove() end
+    end, { timeout = STARTUP_PLACEMENT_MS, type = "oneshot" })
+
     hl.exec_cmd(apps.terminal)
     hl.exec_cmd(apps.browser)
+    hl.exec_cmd(apps.music)
     hl.exec_cmd("waybar")
     -- awww animates theme switches; hyprpaper is the fallback until awww is installed
     hl.exec_cmd("command -v awww-daemon >/dev/null && awww-daemon || hyprpaper")
-    hl.exec_cmd("Telegram")
+    hl.exec_cmd(apps.messenger)
     hl.exec_cmd("hypridle")
     -- clipboard history for SUPER + SHIFT + V
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
