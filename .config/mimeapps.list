@@ -10,6 +10,12 @@ application/x-pkz=CiscoPacketTracer-9.0.0.desktop
 application/x-pksz=CiscoPacketTracer-9.0.0.desktop
 x-scheme-handler/claude-cli=claude-code-url-handler.desktop
 application/pdf=com.brave.Browser.desktop
+x-scheme-handler/http=com.brave.Browser.desktop
+x-scheme-handler/https=com.brave.Browser.desktop
+x-scheme-handler/about=com.brave.Browser.desktop
+x-scheme-handler/unknown=com.brave.Browser.desktop
+text/html=com.brave.Browser.desktop
+application/xhtml+xml=com.brave.Browser.desktop
 
 [Added Associations]
 x-scheme-handler/mailto=userapp-Thunderbird-A1VGK3.desktop;
