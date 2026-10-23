@@ -6,6 +6,7 @@
 #   hypr.lua       Hyprland border colours
 #   waybar.css     @define-color palette imported by waybar/style.css
 #   rofi.rasi      colour variables imported by rofi/theme.rasi
+#   dunst.conf     dunst drop-in linked from dunst/dunstrc.d/90-theme.conf
 #   ghostty        Ghostty theme file
 #   btop.theme     btop theme
 #   hyprlock.conf  hyprlock colour variables
@@ -74,7 +75,7 @@ generate_theme() {
 # files only, never overwriting what is already there (hand-made themes stay as is).
 backfill_theme() {
     local dir="$1" name wallpaper="" tmp f missing=0
-    for f in theme.env hypr.lua waybar.css rofi.rasi ghostty btop.theme hyprlock.conf; do
+    for f in theme.env hypr.lua waybar.css rofi.rasi dunst.conf ghostty btop.theme hyprlock.conf; do
         [[ -e "$dir/$f" ]] || missing=1
     done
     (( missing )) || return 0
@@ -183,6 +184,9 @@ apply_hyprland() {
 reload_apps() {
     pkill -USR2 -x waybar 2>/dev/null || true   # waybar: SIGUSR2 reloads config and style
     pkill -USR2 -x ghostty 2>/dev/null || true  # ghostty (GTK): SIGUSR2 reloads config
+    if pgrep -x dunst >/dev/null; then                # dunst: re-read dunstrc and dunstrc.d
+        dunstctl reload 2>/dev/null || true
+    fi
 }
 
 link_btop() {
