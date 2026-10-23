@@ -24,7 +24,7 @@ hl.on("hyprland.start", function()
     -- clipboard history for SUPER + SHIFT + V
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
-    -- low battery (<10%) and high RAM (>28 GiB) notifications
+    -- low battery (<10%) and high RAM (>28 GB) notifications
     hl.exec_cmd("$HOME/dotfiles_arch/.local/bin/system-alerts")
 end)
 
