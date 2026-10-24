@@ -122,6 +122,10 @@ PACMAN_PACKAGES=(
 
 sudo pacman -S --needed --noconfirm "${PACMAN_PACKAGES[@]}"
 
+# The driver preserves video memory across sleep only through these units; without them resume shows a black screen
+echo "Enabling NVIDIA suspend/resume services..."
+sudo systemctl enable nvidia-suspend.service nvidia-resume.service nvidia-hibernate.service
+
 echo "Create directories"
 mkdir -p ~/develop ~/Pictures ~/Videos
 
