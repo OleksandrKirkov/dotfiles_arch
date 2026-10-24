@@ -162,7 +162,7 @@ FLATPACK_APPS=(
 
 sudo flatpak install -y "${FLATPACK_APPS[@]}"
 
-# Brave renders on the Intel iGPU; the global NVIDIA VAAPI/GBM env breaks video playback
+# Brave renders on the Intel iGPU; pin its VAAPI driver so video decode never picks NVIDIA
 echo "Pinning Brave to the Intel VAAPI driver..."
 flatpak override --user --env=LIBVA_DRIVER_NAME=iHD --unset-env=GBM_BACKEND com.brave.Browser
 
