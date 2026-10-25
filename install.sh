@@ -61,6 +61,8 @@ PACMAN_PACKAGES=(
     neovim
     nano
     ripgrep
+    fd
+    zoxide
 
     hyprland
     hypridle
