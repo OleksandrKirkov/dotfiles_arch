@@ -3,6 +3,7 @@
 - [Hyprland](#hyprland)
 - [Ghostty](#ghostty)
 - [tmux](#tmux)
+- [Neovim](#neovim)
 
 ## Hyprland
 
@@ -240,3 +241,197 @@ Everything copied goes to the Wayland clipboard (`wl-copy`).
 | `Prefix I` / `Prefix U` / `Prefix Alt+U` | TPM: install / update / remove plugins |
 
 Taken from other programs: `Ctrl+L` no longer clears the shell (use `clear`), and `Alt+H` / `Alt+L` no longer reach zsh or nvim.
+
+## Neovim
+
+Config: `~/.config/nvim`, an NvChad v2.5 setup that is **not part of this repo** (its own git checkout of `NvChad/starter`).
+Own maps live in `lua/mappings.lua` on top of NvChad's defaults. The leader is `Space`; pausing after it (or after `g`,
+`c`, `v`, `'`, `` ` ``, `"`, `Ctrl+W`) opens which-key with the next keys. `<leader>fk` searches every map.
+This section lists the maps that work; see [Conflicts](#conflicts) and [Broken maps](#broken-maps) at the end.
+
+### General
+
+| Keys | Action |
+|---|---|
+| `;` | Command line (same as `:`) |
+| `Esc` | Clear search highlights |
+| `Ctrl+S` | Write the file (forced) |
+| `<leader>w` | Write the file |
+| `<leader>q` | Quit the window |
+| `<leader>n`, `<leader>b` | New empty buffer |
+| `Ctrl+C` | Copy the whole file to the clipboard |
+| `<leader>/`, `gcc` | Toggle comment on the line (`<leader>/` / `gc` on a selection) |
+| `<leader>rn` | Toggle relative line numbers |
+| `<leader>cd` / `<leader>cb` | Set the working directory to the file's directory / one level up |
+| `<leader>H` | Dashboard |
+| `<leader>ch` | NvChad cheatsheet |
+| `<leader>th` | NvChad themes |
+| `<leader>wK` / `<leader>wk` | which-key: all maps / look up a key |
+
+### Windows, splits and tabs
+
+| Keys | Action |
+|---|---|
+| `\` | Vertical split |
+| `\|` | Horizontal split |
+| `Ctrl+H` / `J` / `K` / `L` | Go to the window left / below / above / right (inside nvim only, see Conflicts) |
+| `Ctrl+Up` / `Ctrl+Down` | Window height +2 / -2 |
+| `Ctrl+Left` / `Ctrl+Right` | Window width -2 / +2 |
+| `]t` / `[t` | Next / previous tab |
+
+### Buffers
+
+| Keys | Action |
+|---|---|
+| `Tab` / `Shift+Tab`, `]b` / `[b` | Next / previous buffer |
+| `<leader>x` | Close the buffer |
+| `<leader>bc` | Close every other buffer |
+| `<leader>bC`, `<leader>cx` | Close all buffers |
+
+### Files and search
+
+| Keys | Action |
+|---|---|
+| `<leader>e` | Toggle the file tree (neo-tree) |
+| `<leader>o` | Focus the file tree |
+| `s` / `S` / `?` in the tree | Open in a vertical / horizontal split, help |
+| `<leader>ff` | Find files |
+| `<leader>fF` | Find files, hidden and ignored ones too |
+| `<leader>fa` | Find all files (follows symlinks, ignored ones too) |
+| `<leader>fw` | Live grep |
+| `<leader>fW` | Live grep, hidden and ignored files too |
+| `<leader>fc` | Grep the word under the cursor |
+| `<leader>fz` | Fuzzy find in the current buffer |
+| `<leader>fb` | Open buffers; after Telescope has loaded once it becomes the file browser (`m` moves a file there) |
+| `<leader>fo` | Recently opened files |
+| `<leader>f'`, `<leader>ma` | Marks |
+| `<leader>fr` | Registers |
+| `<leader>ft` | TODO comments |
+| `<leader>fh` / `<leader>fm` | Help tags / man pages |
+| `<leader>fC` / `<leader>fk` | Commands / keymaps |
+| `<leader>fn` | Notifications |
+| `<leader>pt` | Hidden terminals |
+
+### LSP and diagnostics
+
+| Keys | Action |
+|---|---|
+| `K` | Hover documentation |
+| `gd` / `gD` | Go to definition / declaration |
+| `gy` / `gI` | Go to type definition / implementation |
+| `gr`, `<leader>lR` | References |
+| `<leader>la` | Code action |
+| `<leader>lr` | Rename |
+| `<leader>lh` | Signature help (`Ctrl+S` in insert mode) |
+| `<leader>lf` | Format the file (`<leader>fm` on a selection) |
+| `<leader>ls` / `<leader>lG` | Document / workspace symbols |
+| `gl`, `<leader>ld` | Diagnostics of the line |
+| `<leader>dk` / `<leader>dK` | Diagnostic popup / the same, focused so it can be scrolled and copied |
+| `<leader>lD` | All diagnostics (Telescope) |
+| `]d` / `[d` | Next / previous diagnostic |
+
+Neovim 0.12 also maps `gra` (code action), `grn` (rename), `grr` (references), `gri` (implementation),
+`grt` (type definition) and `gO` (document symbols).
+
+### Git
+
+| Keys | Action |
+|---|---|
+| `<leader>gg` | LazyGit |
+| `<leader>gl` | Git log graph (vim-flog) |
+| `<leader>gc` | Diff of the last commit (Diffview) |
+| `<leader>gf` | File history (Diffview) |
+| `<leader>gt` | Toggle the Diffview file panel |
+| `<leader>gC` / `<leader>cm` | Commits of the current file / of the repo (Telescope) |
+| `<leader>gb` | Branches |
+
+### Debugging (DAP)
+
+| Keys | Action |
+|---|---|
+| `<leader>dc` | Start / continue |
+| `<leader>db` / `<leader>dC` | Toggle a breakpoint / conditional breakpoint |
+| `<leader>dB` | Clear breakpoints |
+| `F10` / `F11` / `Shift+F11` | Step over / into / out |
+| `<leader>ds` | Run to the cursor |
+| `<leader>dp` / `<leader>dr` | Pause / restart |
+| `<leader>dq` / `<leader>dQ` | Close / terminate the session |
+| `<leader>dh`, `<leader>dE` | Evaluate the expression under the cursor |
+| `<leader>dR` | Toggle the REPL |
+
+### Tests (neotest)
+
+| Keys | Action |
+|---|---|
+| `<leader>tt` | Run the nearest test |
+| `<leader>tf` | Run the tests in the file |
+| `<leader>to` / `<leader>ts` | Test output / summary |
+
+### Terminals
+
+| Keys | Action |
+|---|---|
+| `Ctrl+F` | Toggle a floating terminal |
+| `Ctrl+]` | Toggle a vertical terminal (also from inside it) |
+| `Ctrl+\` | Toggle a horizontal terminal |
+| `Alt+I` | Toggle a floating terminal (nvterm, also from inside it) |
+| `Alt+V` | Toggle a vertical terminal (NvChad) |
+| `<leader>h` / `<leader>v` | New horizontal / vertical terminal |
+| `<leader>tn` | Full-screen terminal in a new tab |
+| `Ctrl+X`, `nn` in a terminal | Back to normal mode |
+| `Ctrl+H` / `J` / `K` / `L` in a terminal | Move to the window or tmux pane in that direction (vim-tmux-navigator) |
+
+### Sessions
+
+| Keys | Action |
+|---|---|
+| `<leader>Ss` | Save the session |
+| `<leader>Sl`, `<leader>S.` | Restore the session of the working directory |
+| `<leader>Sd` | Delete the session |
+| `<leader>Sf` | Search sessions |
+
+### Plugins and tools
+
+| Keys | Action |
+|---|---|
+| `<leader>ps` | Lazy status |
+| `<leader>pi` / `<leader>pu` | Lazy install / check for updates |
+| `<leader>pa`, `<leader>pU` | Lazy update |
+| `<leader>pS` | Lazy sync |
+| `<leader>pm` | Mason |
+| `<leader>dd` | lazydocker in a floating window |
+
+### Insert and visual mode
+
+| Keys | Action |
+|---|---|
+| `jj` (insert) | Back to normal mode |
+| `Ctrl+B` / `Ctrl+E` (insert) | Start / end of the line |
+| `Ctrl+H` / `J` / `K` / `L` (insert) | Move the cursor left / down / up / right |
+| `Tab` / `Shift+Tab` (visual) | Indent / unindent, keeping the selection |
+
+### Conflicts
+
+- `Ctrl+H/J/K/L` in normal mode are NvChad's window moves, which replace vim-tmux-navigator's. tmux hands the key to
+  nvim, nvim moves between its own windows, and at the edge nothing happens: you cannot leave nvim for a tmux pane
+  with these keys (only from an nvim terminal). Use `Prefix h/j/k/l` from nvim.
+- `Alt+1..9` (go to tab N) and `Alt+H` (NvChad horizontal terminal) never reach nvim: tmux takes them first.
+  Use `]t` / `[t` and `<leader>h`.
+
+### Broken maps
+
+These are mapped, but the command or plugin behind them is missing, so they fail with an error.
+
+| Keys | Calls | Why it fails |
+|---|---|---|
+| `Ctrl+N` | `NvimTreeToggle` | nvim-tree is disabled (neo-tree is used: `<leader>e`) |
+| `<leader>qx` `qw` `qd` `qq` `ql` `qt` | `TroubleToggle`, `TodoTrouble` | Trouble v3 has no `TroubleToggle`, and `:Trouble` is never set up |
+| `<leader>ae` `ad` `ac` | `Copilot`, `CopilotChat` | Copilot is not installed |
+| `<leader>lI` | `NullLsInfo` | null-ls is not installed |
+| `<leader>lS` | `SymbolsOutline` | symbols-outline is not installed |
+| `>b` / `<b` | `BufferLineMoveNext/Prev` | bufferline is not installed (NvChad uses its own tabufline) |
+| `<leader>li` | `LspInfo` | removed from nvim-lspconfig for Neovim 0.12 (`:checkhealth vim.lsp`) |
+| `<leader>pA` | `NvChadUpdate` | no longer exists in NvChad v2.5 (`<leader>pU` updates it) |
+| `<leader>pl` | `git -C ~/.local/share/nvchad log` | that directory does not exist |
+
+hop.nvim's `<leader>fs` `fl` `fw` `fp` are never created: hop is lazy-loaded with no trigger, so it never loads.
