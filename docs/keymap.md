@@ -6,6 +6,7 @@
 - [zsh](#zsh)
 - [Neovim](#neovim)
 - [yazi](#yazi)
+- [lazygit](#lazygit)
 
 ## Hyprland
 
@@ -621,3 +622,136 @@ Prompts start in insert mode and work like a small vi: `Esc` switches to normal 
 
 Inside tmux, the prompt keys `Ctrl+H` (backspace) and `Ctrl+K` (delete to the end) never reach yazi: tmux takes them for
 pane moves. Use `Backspace` and `Esc` `D`.
+
+## lazygit
+
+`.config/lazygit/config.yml` is empty, so every key is a lazygit 0.66.2 default (`lazygit --config` prints them).
+Open it with `Prefix g` (tmux), `<leader>gg` (nvim) or `lazygit`. `?` lists the keys of the focused panel, and most
+keys act on the selected item of that panel.
+
+### Panels and lists
+
+| Keys | Action |
+|---|---|
+| `1` .. `5` | Status / Files / Branches / Commits / Stash panel |
+| `h` / `l`, `Left` / `Right`, `Tab` / `Shift+Tab` | Previous / next panel |
+| `[` / `]` | Previous / next tab inside the panel (e.g. Local branches, Remotes, Tags) |
+| `j` / `k`, `Down` / `Up` | Next / previous item |
+| `<` / `>`, `Home` / `End` | First / last item |
+| `,` / `.` | Previous / next page |
+| `v`, `Shift+Down` / `Shift+Up` | Select a range |
+| `/` | Search or filter the panel (`n` / `N` next / previous match) |
+| `Enter` | Open the item (files of a commit, commits of a branch) |
+| `0` | Focus the diff on the right |
+| `J` / `K`, `Ctrl+D` / `Ctrl+U` | Scroll the diff down / up |
+| `Esc` | Back / cancel |
+
+### Everywhere
+
+| Keys | Action |
+|---|---|
+| `p` / `P` | Pull / push |
+| `R` | Refresh |
+| `z` / `Z` | Undo / redo (through the reflog) |
+| `m` | Merge / rebase options (continue, abort, skip) |
+| `:` | Run a shell command |
+| `Ctrl+R` | Switch to a recently opened repo |
+| `@` | Command log options |
+| `+` / `_` | Bigger / smaller layout (normal, half, full screen) |
+| `{` / `}` | Less / more diff context |
+| `Ctrl+W` | Toggle whitespace in diffs |
+| `W`, `Ctrl+E` | Diff two refs |
+| `Ctrl+S` | Filter the log by path or author |
+| `q`, `Ctrl+C` | Quit |
+
+### Files (2)
+
+| Keys | Action |
+|---|---|
+| `Space` / `a` | Stage / unstage the file / all files |
+| `Enter` | Stage lines or hunks in the diff (see Diff) |
+| `c` / `C` | Commit / commit in the git editor |
+| `w` | Commit without the pre-commit hook |
+| `A` | Amend the last commit |
+| `d` | Discard the changes in the file |
+| `D` | Reset options (soft, mixed, hard, nuke the working tree) |
+| `s` / `S` | Stash all changes / stash options |
+| `e` / `o` | Edit / open the file |
+| `i` | Add to `.gitignore` or `.git/info/exclude` |
+| `f` | Fetch |
+| `` ` `` | Toggle the file tree |
+| `-` / `=` | Collapse / expand all directories |
+| `M` | Merge conflict options |
+| `Ctrl+O` / `y` | Copy the path / choose what to copy (name, diff, ...) |
+
+### Diff (after Enter on a file)
+
+| Keys | Action |
+|---|---|
+| `Space` | Stage / unstage the line or selection |
+| `a` | Switch between line and hunk selection |
+| `v` | Select a range of lines |
+| `h` / `l` | Previous / next hunk |
+| `n` / `N` | Next / previous file |
+| `Tab` | Switch between the unstaged and staged side |
+| `d` | Discard the line or hunk |
+| `e` / `E` | Edit the file / the hunk |
+| `Esc` | Back to the file list |
+
+Merge conflicts: `k` / `j` previous / next hunk, `h` / `l` previous / next conflict, `Space` picks the hunk, `b` picks both,
+`z` undoes.
+
+### Branches (3)
+
+| Keys | Action |
+|---|---|
+| `Space` | Check out |
+| `c` | Check out by name |
+| `-` | Check out the previous branch |
+| `n` | New branch |
+| `R` | Rename |
+| `d` | Delete |
+| `M` / `r` | Merge into / rebase the current branch onto the selected one |
+| `f` | Fast-forward |
+| `u` | Upstream options |
+| `o` / `G` | Create / open a pull request |
+| `T` | New tag |
+| `Enter` | Commits of the branch |
+
+On the Remotes tab, `Space` checks out a remote branch and `u` sets it as upstream.
+
+### Commits (4)
+
+| Keys | Action |
+|---|---|
+| `Enter` | Files of the commit |
+| `r` / `R` | Reword / reword in the editor |
+| `s` / `f` | Squash / fixup into the commit below |
+| `F` / `S` | Create a fixup commit / apply fixup commits |
+| `d` | Drop |
+| `e`, `i` | Start an interactive rebase at the commit |
+| `Alt+Down` / `Alt+Up` | Move the commit down / up |
+| `A` | Amend the commit with the staged changes |
+| `C` / `V` | Copy / paste (cherry-pick) |
+| `t` | Revert |
+| `T` | Tag |
+| `g` | Reset to the commit (soft, mixed, hard) |
+| `n` | New branch from the commit |
+| `B` | Mark as the base for a rebase |
+| `b` | Bisect options |
+| `o` | Open in the browser |
+| `y` | Copy the hash, message, URL... |
+
+### Stash (5)
+
+| Keys | Action |
+|---|---|
+| `Space` / `g` | Apply / pop |
+| `d` | Drop |
+| `n` | New branch from the stash |
+| `r` | Rename |
+| `Enter` | Files of the stash |
+
+Inside tmux, and in the lazygit float of nvim, lazygit never receives `Ctrl+J` / `Ctrl+K` (move a commit down / up) or
+`Ctrl+L` (log options): tmux and vim-tmux-navigator take them for pane moves. Use `Alt+Down` / `Alt+Up`, and `?` for
+the log options.
