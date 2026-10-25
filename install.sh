@@ -119,6 +119,9 @@ PACMAN_PACKAGES=(
     #nvidia
     nvidia-utils
     nvidia-settings
+
+    # Intel Vulkan driver, so Vulkan apps stop waking the NVIDIA GPU
+    vulkan-intel
 )
 
 sudo pacman -S --needed --noconfirm "${PACMAN_PACKAGES[@]}"
