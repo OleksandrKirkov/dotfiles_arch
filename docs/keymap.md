@@ -7,6 +7,7 @@
 - [Neovim](#neovim)
 - [yazi](#yazi)
 - [lazygit](#lazygit)
+- [lazydocker](#lazydocker)
 
 ## Hyprland
 
@@ -755,3 +756,62 @@ On the Remotes tab, `Space` checks out a remote branch and `u` sets it as upstre
 Inside tmux, and in the lazygit float of nvim, lazygit never receives `Ctrl+J` / `Ctrl+K` (move a commit down / up) or
 `Ctrl+L` (log options): tmux and vim-tmux-navigator take them for pane moves. Use `Alt+Down` / `Alt+Up`, and `?` for
 the log options.
+
+## lazydocker
+
+`.config/lazydocker/config.yml` is empty, so every key is a lazydocker 0.25.2 default. Open it with `Prefix d` (tmux),
+`<leader>dd` (nvim) or `lazydocker`. `x` or `?` lists the keys of the focused panel.
+
+### Panels and lists
+
+| Keys | Action |
+|---|---|
+| `1` .. `6` | Project / Services / Containers / Images / Volumes / Networks panel |
+| `h` / `l`, `Left` / `Right`, `Shift+Tab` / `Tab` | Previous / next panel |
+| `j` / `k`, `Down` / `Up` | Next / previous item |
+| `[` / `]` | Previous / next tab on the right (Logs, Stats, Env, Config, Top...) |
+| `/` | Filter the list |
+| `Enter` | Focus the right side (`Esc` goes back) |
+| `J` / `K`, `Ctrl+D` / `Ctrl+U`, `Page Down` / `Page Up` | Scroll the right side down / up |
+| `H` / `L` | Scroll the right side left / right |
+| `Home` / `End` | Top of the right side / follow the end (logs) |
+| `+` / `_` | Bigger / smaller layout (normal, half, full screen) |
+| `q`, `Ctrl+C` | Quit |
+
+### Containers (3)
+
+| Keys | Action |
+|---|---|
+| `s` / `r` | Stop / restart |
+| `p` | Pause / unpause |
+| `d` | Remove |
+| `E` | Open a shell inside the container |
+| `a` | Attach to the container |
+| `m` | Logs in the terminal |
+| `w` | Open the first port in the browser |
+| `e` | Show / hide stopped containers |
+| `b` | Bulk commands (stop all, remove all, prune...) |
+| `c` | Run a custom command from the config |
+
+### Services (2, Compose projects)
+
+| Keys | Action |
+|---|---|
+| `u` / `S` | Up / start the service |
+| `s` / `r` / `R` | Stop / restart / restart options (rebuild, recreate) |
+| `p` | Pause / unpause |
+| `d` | Remove the service's containers |
+| `E` / `a` / `m` | Shell / attach / logs, as for containers |
+| `w` | Open the first port in the browser |
+| `U` / `D` | Up / down the whole project |
+| `b` / `c` | Bulk / custom commands |
+
+### Images, volumes, networks (4, 5, 6)
+
+| Keys | Action |
+|---|---|
+| `d` | Remove the image / volume / network |
+| `b` | Bulk commands (prune unused) |
+| `c` | Run a custom command from the config |
+
+On the Project panel (1), `m` shows the logs of every service, `e` / `o` edit / open the lazydocker config.
