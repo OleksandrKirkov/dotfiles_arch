@@ -130,6 +130,10 @@ sudo pacman -S --needed --noconfirm "${PACMAN_PACKAGES[@]}"
 echo "Enabling NVIDIA suspend/resume services..."
 sudo systemctl enable nvidia-suspend.service nvidia-resume.service nvidia-hibernate.service
 
+# Dynamic Boost is unsupported here (NvPcfApi is not initialized), and the daemon wakes the GPU on every AC/battery switch
+echo "Disabling nvidia-powerd..."
+sudo systemctl disable nvidia-powerd.service
+
 echo "Create directories"
 mkdir -p ~/develop ~/Pictures ~/Videos
 
