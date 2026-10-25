@@ -56,6 +56,8 @@ PACMAN_PACKAGES=(
     zsh
     ghostty
     tmux
+    fzf
+    inetutils
     neovim
     nano
     ripgrep
@@ -156,6 +158,7 @@ AUR_PACKAGES=(
     wlogout
     youtube-music-bin
     ttf-jetbrains-mono-nerd
+    tmux-fingers
 )
 
 yay -S --needed --noconfirm "${AUR_PACKAGES[@]}"
