@@ -5,6 +5,7 @@
 - [tmux](#tmux)
 - [zsh](#zsh)
 - [Neovim](#neovim)
+- [yazi](#yazi)
 
 ## Hyprland
 
@@ -505,3 +506,118 @@ Neovim 0.12 also maps `gra` (code action), `grn` (rename), `grr` (references), `
 
 - `Alt+1..9` (go to tab N) and `Alt+H` (NvChad horizontal terminal) never reach nvim: tmux takes them first.
   Use `]t` / `[t` and `<leader>h`.
+
+## yazi
+
+There is no yazi config, so every key is a yazi 26.9.1 default. Open it with `SUPER+E` (Hyprland) or `Prefix y` (tmux).
+`~` or `F1` shows the keys of the current mode. Keys written as `g h` are pressed one after the other.
+
+### Moving around
+
+| Keys | Action |
+|---|---|
+| `j` / `k`, `Down` / `Up` | Next / previous file |
+| `h` / `l`, `Left` / `Right` | Parent directory / enter the directory |
+| `H` / `L` | Back / forward in the directory history |
+| `g g` / `G`, `Home` / `End` | Top / bottom of the list |
+| `Ctrl+D` / `Ctrl+U` | Half a page down / up |
+| `Ctrl+F` / `Ctrl+B` | A page down / up |
+| `J` / `K` | Scroll the preview down / up |
+| `Tab` | Details of the file under the cursor (spot; `Tab` or `Esc` closes it) |
+
+### Going to places
+
+| Keys | Action |
+|---|---|
+| `g h` / `g c` / `g d` | Home / `~/.config` / `~/Downloads` |
+| `g t` | Trash |
+| `g Space` | Type a path to jump to |
+| `g f` | Follow the symlink under the cursor |
+| `z` | Jump to a file or directory with fzf |
+| `Z` | Jump to a directory with zoxide (zoxide is not installed, so this does not work) |
+
+### Selecting
+
+| Keys | Action |
+|---|---|
+| `Space` | Select / unselect the file and move down |
+| `Ctrl+A` / `Ctrl+R` | Select all / invert the selection |
+| `v` / `V` | Visual mode: select / unselect a range |
+| `Esc` | Leave visual mode, clear the selection or cancel a search |
+
+### File operations
+
+They act on the selection, or on the file under the cursor when nothing is selected.
+
+| Keys | Action |
+|---|---|
+| `o`, `Enter` | Open |
+| `O`, `Shift+Enter` | Open with a chosen program |
+| `y` / `x` | Copy / cut |
+| `p` / `P` | Paste / paste and overwrite |
+| `Y`, `X` | Cancel the copy / cut |
+| `-` / `_` | Symlink the copied files here (absolute / relative path) |
+| `Ctrl+-` | Hardlink the copied files here |
+| `d` / `D` | Move to the trash / delete permanently |
+| `a` | Create a file (end the name with `/` for a directory) |
+| `A` | Create several files |
+| `r` | Rename |
+| `c c` / `c d` / `c f` / `c n` | Copy the path / directory path / file name / name without extension |
+| `c C` / `c D` | Copy the file / directory as a URL |
+
+### Search, filter, sort
+
+| Keys | Action |
+|---|---|
+| `/` / `?` | Find the next / previous file by name |
+| `n` / `N` | Next / previous match |
+| `f` | Filter the list |
+| `s` | Search file names with fd (fd is not installed, so this does not work) |
+| `S` | Search file contents with ripgrep |
+| `Ctrl+S` | Cancel the running search |
+| `.` | Show / hide hidden files |
+| `, m` / `, s` / `, a` / `, n` / `, e` / `, b` | Sort by modified time / size / name / natural order / extension / creation time |
+| `, M` `, S` `, A` `, N` `, E` `, B` | The same sorts, reversed |
+| `, r` | Random order |
+| `m s` / `m p` / `m m` / `m b` / `m o` / `m n` | Show size / permissions / modified time / creation time / owner / nothing next to files |
+
+### Tabs, tasks, shell
+
+| Keys | Action |
+|---|---|
+| `t t` | New tab in the current directory |
+| `t r` | Rename the tab |
+| `1` .. `9` | Go to tab 1..9 |
+| `[` / `]` | Previous / next tab |
+| `{` / `}` | Move the tab left / right |
+| `w` | Task manager (`j` / `k` move, `Enter` inspects, `x` cancels, `w` closes) |
+| `;` | Run a shell command |
+| `:` | Run a shell command and wait for it to finish |
+| `Ctrl+Z` | Suspend yazi (`fg` brings it back) |
+
+### Quitting
+
+| Keys | Action |
+|---|---|
+| `q` | Quit |
+| `Q` | Quit without writing the cwd file (only matters with `yazi --cwd-file`) |
+| `Ctrl+C` | Close the tab, or quit on the last one |
+
+### Prompts (rename, create, shell)
+
+Prompts start in insert mode and work like a small vi: `Esc` switches to normal mode (`h` `l` `w` `b` `e` `0` `$`,
+`d` `c` `x` `y` `p`, `u` undo, `Ctrl+R` redo), `Esc` again cancels, `Enter` submits.
+
+| Keys | Action |
+|---|---|
+| `Ctrl+A` / `Ctrl+E`, `Home` / `End` | Start / end of the text |
+| `Alt+B` / `Alt+F`, `Ctrl+Left` / `Ctrl+Right` | One word back / forward |
+| `Ctrl+W`, `Ctrl+Backspace` | Delete the word before the cursor |
+| `Alt+D`, `Ctrl+Delete` | Delete the word after the cursor |
+| `Ctrl+U` | Delete to the start |
+| `Ctrl+D` | Delete the character under the cursor |
+| `Up` / `Down`, `Ctrl+P` / `Ctrl+N` | Earlier / later input |
+| `Tab` | Accept the completion (`Alt+J` / `Alt+K` move through the list) |
+
+Inside tmux, the prompt keys `Ctrl+H` (backspace) and `Ctrl+K` (delete to the end) never reach yazi: tmux takes them for
+pane moves. Use `Backspace` and `Esc` `D`.
