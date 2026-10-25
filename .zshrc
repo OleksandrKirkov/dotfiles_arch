@@ -206,3 +206,8 @@ export PATH="$PATH:$HOME/.dotnet/tools"
 
 # Added by Antigravity CLI installer
 export PATH="/home/oleksandr/.local/bin:$PATH"
+
+# zoxide: learns every directory you cd into (z / zi to jump, yazi's Z lists them); keep at the end of .zshrc
+if command -v zoxide >/dev/null; then
+    eval "$(zoxide init zsh)"
+fi
