@@ -274,7 +274,7 @@ This section lists the maps that work; see [Conflicts](#conflicts) and [Broken m
 |---|---|
 | `\` | Vertical split |
 | `\|` | Horizontal split |
-| `Ctrl+H` / `J` / `K` / `L` | Go to the window left / below / above / right (inside nvim only, see Conflicts) |
+| `Ctrl+H` / `J` / `K` / `L` | Go to the window left / below / above / right; at the edge of nvim, on to the tmux pane there (wraps around like tmux) |
 | `Ctrl+Up` / `Ctrl+Down` | Window height +2 / -2 |
 | `Ctrl+Left` / `Ctrl+Right` | Window width -2 / +2 |
 | `]t` / `[t` | Next / previous tab |
@@ -412,9 +412,6 @@ Neovim 0.12 also maps `gra` (code action), `grn` (rename), `grr` (references), `
 
 ### Conflicts
 
-- `Ctrl+H/J/K/L` in normal mode are NvChad's window moves, which replace vim-tmux-navigator's. tmux hands the key to
-  nvim, nvim moves between its own windows, and at the edge nothing happens: you cannot leave nvim for a tmux pane
-  with these keys (only from an nvim terminal). Use `Prefix h/j/k/l` from nvim.
 - `Alt+1..9` (go to tab N) and `Alt+H` (NvChad horizontal terminal) never reach nvim: tmux takes them first.
   Use `]t` / `[t` and `<leader>h`.
 
