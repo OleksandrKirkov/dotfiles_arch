@@ -28,7 +28,8 @@ keybind = ctrl+shift+f11=toggle_fullscreen
 # =========================
 # 🐚 SHELL
 # =========================
-command = zsh
+# Attach to the "main" tmux session, creating it on first launch
+command = /usr/bin/tmux new-session -A -s main
 
 # =========================
 # 🌿 ENVIRONMENT
