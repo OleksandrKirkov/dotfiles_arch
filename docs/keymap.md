@@ -534,7 +534,7 @@ There is no yazi config, so every key is a yazi 26.9.1 default. Open it with `SU
 | `g Space` | Type a path to jump to |
 | `g f` | Follow the symlink under the cursor |
 | `z` | Jump to a file or directory with fzf |
-| `Z` | Jump to a directory with zoxide (zoxide is not installed, so this does not work) |
+| `Z` | Jump to a directory with zoxide (it lists the directories you have `cd`'d into in zsh) |
 
 ### Selecting
 
@@ -572,7 +572,7 @@ They act on the selection, or on the file under the cursor when nothing is selec
 | `/` / `?` | Find the next / previous file by name |
 | `n` / `N` | Next / previous match |
 | `f` | Filter the list |
-| `s` | Search file names with fd (fd is not installed, so this does not work) |
+| `s` | Search file names with fd |
 | `S` | Search file contents with ripgrep |
 | `Ctrl+S` | Cancel the running search |
 | `.` | Show / hide hidden files |
