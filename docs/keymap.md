@@ -72,12 +72,10 @@ These also work on the lock screen. Volume and brightness repeat while held.
 
 ## Ghostty
 
-Config: `.config/ghostty/config`. It sets one bind of its own (`Ctrl+Shift+F11`); everything else is Ghostty's default.
-`ghostty +list-keybinds` prints what is in effect. Every Ghostty window starts tmux (session `main`), so tabs and splits
-are rarely needed: tmux windows and panes do the same job.
-
-Conflicts with tmux: Ghostty takes a key before tmux sees it. `Alt+1` .. `Alt+9` switch Ghostty tabs, so the tmux
-`Alt+1..9` window jumps never arrive; `Ctrl+Enter` toggles fullscreen instead of reaching the program.
+Config: `.config/ghostty/config`. It adds `Ctrl+Shift+F11` and unbinds `Alt+1..9` and `Ctrl+Enter`, so those reach
+tmux and the programs inside it; everything else is Ghostty's default. `ghostty +list-keybinds` prints what is in effect.
+Every Ghostty window starts tmux (session `main`), so tabs and splits are rarely needed: tmux windows and panes do the
+same job.
 
 ### Window and app
 
@@ -86,7 +84,7 @@ Conflicts with tmux: Ghostty takes a key before tmux sees it. `Alt+1` .. `Alt+9`
 | `Ctrl+Shift+N` | New window |
 | `Alt+F4` | Close the window |
 | `Ctrl+Shift+Q` | Quit Ghostty |
-| `Ctrl+Enter`, `Ctrl+Shift+F11` | Toggle fullscreen |
+| `Ctrl+Shift+F11` | Toggle fullscreen |
 | `Ctrl+Shift+P` | Command palette |
 | `Ctrl+,` | Open the config |
 | `Ctrl+Shift+,` | Reload the config |
@@ -100,8 +98,6 @@ Conflicts with tmux: Ghostty takes a key before tmux sees it. `Alt+1` .. `Alt+9`
 | `Ctrl+Shift+W` | Close the tab |
 | `Ctrl+Tab`, `Ctrl+Page Down`, `Ctrl+Shift+Right` | Next tab |
 | `Ctrl+Shift+Tab`, `Ctrl+Page Up`, `Ctrl+Shift+Left` | Previous tab |
-| `Alt+1` .. `Alt+8` | Go to tab 1..8 |
-| `Alt+9` | Last tab |
 
 ### Splits
 
