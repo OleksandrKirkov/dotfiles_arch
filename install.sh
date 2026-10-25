@@ -41,7 +41,8 @@ PACMAN_PACKAGES=(
     gvfs-smb
     wl-clipboard
     cliphist
-    power-profiles-daemon
+    tlp
+    tlp-pd
     webkit2gtk-4.1
     file
     openssl
@@ -133,6 +134,10 @@ sudo systemctl enable nvidia-suspend.service nvidia-resume.service nvidia-hibern
 # Dynamic Boost is unsupported here (NvPcfApi is not initialized), and the daemon wakes the GPU on every AC/battery switch
 echo "Disabling nvidia-powerd..."
 sudo systemctl disable nvidia-powerd.service
+
+# TLP applies battery settings at boot (powers off the NVIDIA slot); tlp-pd serves the power-profiles D-Bus API for waybar
+echo "Enabling TLP..."
+sudo systemctl enable tlp.service tlp-pd.service
 
 echo "Create directories"
 mkdir -p ~/develop ~/Pictures ~/Videos
