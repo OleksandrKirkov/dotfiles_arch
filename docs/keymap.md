@@ -3,6 +3,7 @@
 - [Hyprland](#hyprland)
 - [Ghostty](#ghostty)
 - [tmux](#tmux)
+- [zsh](#zsh)
 - [Neovim](#neovim)
 
 ## Hyprland
@@ -242,12 +243,86 @@ Everything copied goes to the Wayland clipboard (`wl-copy`).
 
 Taken from other programs: `Ctrl+L` no longer clears the shell (use `clear`), and `Alt+H` / `Alt+L` no longer reach zsh or nvim.
 
+## zsh
+
+Config: `.zshrc` with Oh My Zsh (plugins `git`, `zsh-syntax-highlighting`, `zsh-autosuggestions`). There are no
+`bindkey` lines of our own: the line editor uses the emacs keymap that Oh My Zsh selects, plus its arrow and Home/End keys.
+`bindkey` prints every binding. Keys that tmux takes first are listed under [Conflicts](#conflicts).
+
+### Moving
+
+| Keys | Action |
+|---|---|
+| `Ctrl+A` / `Ctrl+E`, `Home` / `End` | Start / end of the line |
+| `Ctrl+B` / `Ctrl+F`, `Left` / `Right` | One character back / forward |
+| `Alt+B` / `Alt+F`, `Ctrl+Left` / `Ctrl+Right` | One word back / forward |
+
+### Editing
+
+| Keys | Action |
+|---|---|
+| `Backspace` / `Delete` | Delete the character before / under the cursor |
+| `Ctrl+W`, `Alt+Backspace` | Delete the word before the cursor |
+| `Alt+D`, `Ctrl+Delete` | Delete the word after the cursor |
+| `Ctrl+U` | Delete the whole line |
+| `Ctrl+Y` / `Alt+Y` | Paste the last deleted text / cycle through older ones |
+| `Ctrl+T` / `Alt+T` | Swap characters / words |
+| `Alt+U` / `Alt+C` | Uppercase / capitalize the word |
+| `Ctrl+_`, `Ctrl+X Ctrl+U` | Undo |
+| `Ctrl+X Ctrl+E` | Edit the command line in `$EDITOR` |
+| `Ctrl+Q`, `Alt+Q` | Park the line: run another command first, then the parked line comes back |
+| `Ctrl+V` | Insert the next key literally |
+
+### History
+
+| Keys | Action |
+|---|---|
+| `Up` / `Down` | Previous / next command starting with what is already typed |
+| `Ctrl+P` / `Ctrl+N` | Previous / next command |
+| `Ctrl+R` / `Ctrl+S` | Search the history backward / forward |
+| `Alt+.`, `Alt+_` | Insert the last argument of the previous command (repeat for older ones) |
+| `Alt+<` / `Alt+>` | First / last history entry |
+| `Space` | Expands `!!`, `!$` and other history references in place |
+
+### Completion and suggestions
+
+| Keys | Action |
+|---|---|
+| `Tab` / `Shift+Tab` | Complete / previous completion in the menu |
+| `Ctrl+D` | Delete the character, or list completions at the end of the line |
+| `Right`, `End`, `Ctrl+E`, `Ctrl+F` | Accept the grey autosuggestion |
+| `Alt+F`, `Ctrl+Right` | Accept the autosuggestion up to the end of the next word |
+| `Ctrl+X a` | Expand the alias under the cursor |
+
+### Other
+
+| Keys | Action |
+|---|---|
+| `Enter` | Run the command |
+| `Alt+A` | Run the command and keep it on the line |
+| `Ctrl+O` | Run the command and load the next history entry (for replaying a sequence) |
+| `Ctrl+G` | Abort the current edit |
+| `Alt+?` | Show what a command is (`which-command`) |
+
+### Conflicts
+
+tmux binds these without the prefix, so zsh never receives them:
+
+| Keys | zsh action that is lost | Instead |
+|---|---|---|
+| `Ctrl+H` / `Ctrl+J` / `Ctrl+K` / `Ctrl+L` | backspace / run / delete to the end of the line / clear the screen | `Backspace` / `Enter` / `Ctrl+U` / `clear` |
+| `Ctrl+Space` (tmux prefix) | set the mark | `Ctrl+@` is the same key, so it is lost too |
+| `Alt+H` / `Alt+L` | help for the command / run `ls` | `run-help` / `ls` |
+| `Alt+Shift+H` / `Alt+Shift+L` | help for the command / lowercase the word | `run-help` / none |
+| `Alt+Space` | expand history references | `Space` does it too |
+| `Alt+1` .. `Alt+9` | numeric argument | none needed in practice |
+
 ## Neovim
 
 Config: `~/.config/nvim`, an NvChad v2.5 setup that is **not part of this repo** (its own git checkout of `NvChad/starter`).
 Own maps live in `lua/mappings.lua` on top of NvChad's defaults. The leader is `Space`; pausing after it (or after `g`,
 `c`, `v`, `'`, `` ` ``, `"`, `Ctrl+W`) opens which-key with the next keys. `<leader>fk` searches every map.
-Keys that tmux takes before nvim sees them are listed under [Conflicts](#conflicts) at the end.
+Keys that tmux takes before nvim sees them are listed under [Conflicts](#conflicts-1) at the end.
 
 ### General
 
