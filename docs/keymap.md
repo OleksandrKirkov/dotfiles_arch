@@ -1,6 +1,7 @@
 # Keymap
 
 - [Hyprland](#hyprland)
+- [Ghostty](#ghostty)
 - [tmux](#tmux)
 
 ## Hyprland
@@ -68,6 +69,88 @@ These also work on the lock screen. Volume and brightness repeat while held.
 | Mic mute | Mute / unmute the microphone |
 | Brightness up / down | Brightness ±10% |
 | Play/Pause, Next, Previous | Media player control (playerctl) |
+
+## Ghostty
+
+Config: `.config/ghostty/config`. It sets one bind of its own (`Ctrl+Shift+F11`); everything else is Ghostty's default.
+`ghostty +list-keybinds` prints what is in effect. Every Ghostty window starts tmux (session `main`), so tabs and splits
+are rarely needed: tmux windows and panes do the same job.
+
+Conflicts with tmux: Ghostty takes a key before tmux sees it. `Alt+1` .. `Alt+9` switch Ghostty tabs, so the tmux
+`Alt+1..9` window jumps never arrive; `Ctrl+Enter` toggles fullscreen instead of reaching the program.
+
+### Window and app
+
+| Keys | Action |
+|---|---|
+| `Ctrl+Shift+N` | New window |
+| `Alt+F4` | Close the window |
+| `Ctrl+Shift+Q` | Quit Ghostty |
+| `Ctrl+Enter`, `Ctrl+Shift+F11` | Toggle fullscreen |
+| `Ctrl+Shift+P` | Command palette |
+| `Ctrl+,` | Open the config |
+| `Ctrl+Shift+,` | Reload the config |
+| `Ctrl+Shift+I` | Toggle the inspector |
+
+### Tabs
+
+| Keys | Action |
+|---|---|
+| `Ctrl+Shift+T` | New tab |
+| `Ctrl+Shift+W` | Close the tab |
+| `Ctrl+Tab`, `Ctrl+Page Down`, `Ctrl+Shift+Right` | Next tab |
+| `Ctrl+Shift+Tab`, `Ctrl+Page Up`, `Ctrl+Shift+Left` | Previous tab |
+| `Alt+1` .. `Alt+8` | Go to tab 1..8 |
+| `Alt+9` | Last tab |
+
+### Splits
+
+| Keys | Action |
+|---|---|
+| `Ctrl+Shift+O` | Split right |
+| `Ctrl+Shift+E` | Split down |
+| `Ctrl+Alt+Arrows` | Focus the split in that direction |
+| `SUPER+Ctrl+]` / `SUPER+Ctrl+[` | Next / previous split |
+| `SUPER+Ctrl+Shift+Arrows` | Resize the split by 10 |
+| `Ctrl+Shift+Enter` | Zoom / unzoom the split |
+
+### Clipboard and selection
+
+| Keys | Action |
+|---|---|
+| `Ctrl+Shift+C`, `Ctrl+Insert`, Copy key | Copy the selection |
+| `Ctrl+Shift+V`, Paste key | Paste from the clipboard |
+| `Shift+Insert` | Paste the primary selection |
+| `Ctrl+Shift+A` | Select all |
+| `Shift+Arrows` | Extend the selection |
+
+### Scrolling and search
+
+| Keys | Action |
+|---|---|
+| `Shift+Page Up` / `Shift+Page Down` | Scroll a page up / down |
+| `Shift+Home` / `Shift+End` | Scroll to the top / bottom |
+| `Ctrl+Shift+Page Up` / `Ctrl+Shift+Page Down` | Jump to the previous / next shell prompt |
+| `Ctrl+Shift+F` | Search |
+| `Esc` | End the search |
+
+Inside tmux, Ghostty's scrollback does not hold the tmux history: use tmux copy mode (`Prefix [`) to scroll and search.
+
+### Font
+
+| Keys | Action |
+|---|---|
+| `Ctrl+=`, `Ctrl++` | Bigger font |
+| `Ctrl+-` | Smaller font |
+| `Ctrl+0` | Reset the font size |
+
+### Screen contents
+
+| Keys | Action |
+|---|---|
+| `Ctrl+Shift+J` | Paste the screen contents as a file path |
+| `SUPER+Ctrl+Shift+J` | Copy the screen contents as a file path |
+| `Ctrl+Alt+Shift+J` | Open the screen contents in the default app |
 
 ## tmux
 
