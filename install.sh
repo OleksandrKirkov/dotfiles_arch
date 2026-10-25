@@ -54,6 +54,7 @@ PACMAN_PACKAGES=(
 
     zsh
     ghostty
+    tmux
     neovim
     nano
     ripgrep
@@ -217,6 +218,7 @@ DIR=(
     "$CONFIG_DIR/ghostty"
     "$CONFIG_DIR/hypr"
     "$CONFIG_DIR/rofi"
+    "$CONFIG_DIR/tmux"
     "$CONFIG_DIR/waybar"
     "$CONFIG_DIR/wofi"
     "$HOME/.gitconfig"
