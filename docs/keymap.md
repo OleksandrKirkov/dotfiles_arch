@@ -247,7 +247,7 @@ Taken from other programs: `Ctrl+L` no longer clears the shell (use `clear`), an
 Config: `~/.config/nvim`, an NvChad v2.5 setup that is **not part of this repo** (its own git checkout of `NvChad/starter`).
 Own maps live in `lua/mappings.lua` on top of NvChad's defaults. The leader is `Space`; pausing after it (or after `g`,
 `c`, `v`, `'`, `` ` ``, `"`, `Ctrl+W`) opens which-key with the next keys. `<leader>fk` searches every map.
-This section lists the maps that work; see [Conflicts](#conflicts) and [Broken maps](#broken-maps) at the end.
+Keys that tmux takes before nvim sees them are listed under [Conflicts](#conflicts) at the end.
 
 ### General
 
@@ -287,12 +287,13 @@ This section lists the maps that work; see [Conflicts](#conflicts) and [Broken m
 | `<leader>x` | Close the buffer |
 | `<leader>bc` | Close every other buffer |
 | `<leader>bC`, `<leader>cx` | Close all buffers |
+| `>b` / `<b` | Move the buffer right / left in the tab line |
 
 ### Files and search
 
 | Keys | Action |
 |---|---|
-| `<leader>e` | Toggle the file tree (neo-tree) |
+| `<leader>e`, `Ctrl+N` | Toggle the file tree (neo-tree) |
 | `<leader>o` | Focus the file tree |
 | `s` / `S` / `?` in the tree | Open in a vertical / horizontal split, help |
 | `<leader>ff` | Find files |
@@ -310,6 +311,8 @@ This section lists the maps that work; see [Conflicts](#conflicts) and [Broken m
 | `<leader>fh` / `<leader>fm` | Help tags / man pages |
 | `<leader>fC` / `<leader>fk` | Commands / keymaps |
 | `<leader>fn` | Notifications |
+| `<leader>fj` / `<leader>fl` | Jump to a word / a line in the window (hop) |
+| `<leader>fs` / `<leader>fp` | Jump to a character in the line / to a pattern (hop) |
 | `<leader>pt` | Hidden terminals |
 
 ### LSP and diagnostics
@@ -325,6 +328,8 @@ This section lists the maps that work; see [Conflicts](#conflicts) and [Broken m
 | `<leader>lh` | Signature help (`Ctrl+S` in insert mode) |
 | `<leader>lf` | Format the file (`<leader>fm` on a selection) |
 | `<leader>ls` / `<leader>lG` | Document / workspace symbols |
+| `<leader>lS` | Symbols outline side panel (outline.nvim) |
+| `<leader>li` / `<leader>lI` | LSP health (`:checkhealth vim.lsp`) / formatter info (`:ConformInfo`) |
 | `gl`, `<leader>ld` | Diagnostics of the line |
 | `<leader>dk` / `<leader>dK` | Diagnostic popup / the same, focused so it can be scrolled and copied |
 | `<leader>lD` | All diagnostics (Telescope) |
@@ -344,6 +349,15 @@ Neovim 0.12 also maps `gra` (code action), `grn` (rename), `grr` (references), `
 | `<leader>gt` | Toggle the Diffview file panel |
 | `<leader>gC` / `<leader>cm` | Commits of the current file / of the repo (Telescope) |
 | `<leader>gb` | Branches |
+
+### Problem lists (Trouble)
+
+| Keys | Action |
+|---|---|
+| `<leader>qx`, `<leader>qw` | Toggle diagnostics of every open file |
+| `<leader>qd` | Toggle diagnostics of the current file |
+| `<leader>qq` / `<leader>ql` | Toggle the quickfix / location list |
+| `<leader>qt` | Toggle TODO comments |
 
 ### Debugging (DAP)
 
@@ -398,6 +412,8 @@ Neovim 0.12 also maps `gra` (code action), `grn` (rename), `grr` (references), `
 | `<leader>pi` / `<leader>pu` | Lazy install / check for updates |
 | `<leader>pa`, `<leader>pU` | Lazy update |
 | `<leader>pS` | Lazy sync |
+| `<leader>pA` | Update NvChad |
+| `<leader>pl` | NvChad's last 10 commits |
 | `<leader>pm` | Mason |
 | `<leader>dd` | lazydocker in a floating window |
 
@@ -414,21 +430,3 @@ Neovim 0.12 also maps `gra` (code action), `grn` (rename), `grr` (references), `
 
 - `Alt+1..9` (go to tab N) and `Alt+H` (NvChad horizontal terminal) never reach nvim: tmux takes them first.
   Use `]t` / `[t` and `<leader>h`.
-
-### Broken maps
-
-These are mapped, but the command or plugin behind them is missing, so they fail with an error.
-
-| Keys | Calls | Why it fails |
-|---|---|---|
-| `Ctrl+N` | `NvimTreeToggle` | nvim-tree is disabled (neo-tree is used: `<leader>e`) |
-| `<leader>qx` `qw` `qd` `qq` `ql` `qt` | `TroubleToggle`, `TodoTrouble` | Trouble v3 has no `TroubleToggle`, and `:Trouble` is never set up |
-| `<leader>ae` `ad` `ac` | `Copilot`, `CopilotChat` | Copilot is not installed |
-| `<leader>lI` | `NullLsInfo` | null-ls is not installed |
-| `<leader>lS` | `SymbolsOutline` | symbols-outline is not installed |
-| `>b` / `<b` | `BufferLineMoveNext/Prev` | bufferline is not installed (NvChad uses its own tabufline) |
-| `<leader>li` | `LspInfo` | removed from nvim-lspconfig for Neovim 0.12 (`:checkhealth vim.lsp`) |
-| `<leader>pA` | `NvChadUpdate` | no longer exists in NvChad v2.5 (`<leader>pU` updates it) |
-| `<leader>pl` | `git -C ~/.local/share/nvchad log` | that directory does not exist |
-
-hop.nvim's `<leader>fs` `fl` `fw` `fp` are never created: hop is lazy-loaded with no trigger, so it never loads.
