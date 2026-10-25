@@ -1,5 +1,74 @@
 # Keymap
 
+- [Hyprland](#hyprland)
+- [tmux](#tmux)
+
+## Hyprland
+
+Config: `.config/hypr/binds.lua`, app choices in `.config/hypr/apps.lua`. `SUPER` is the main modifier.
+`hyprctl binds` lists what the running session has loaded.
+
+### Apps
+
+| Keys | Action |
+|---|---|
+| `SUPER+Q` | Terminal (ghostty) |
+| `SUPER+B` | Browser (Brave) |
+| `SUPER+E` | Terminal file manager (yazi in ghostty) |
+| `SUPER+SHIFT+E` | File manager (nautilus) |
+| `SUPER+Space`, `SUPER+D` | App launcher (rofi) |
+| `SUPER+O` | Obsidian |
+| `SUPER+SHIFT+V` | Clipboard history (cliphist in rofi; the pick is copied) |
+| `ALT+S` | Screenshot of a selected area to the clipboard (grim + slurp) |
+
+### Windows
+
+| Keys | Action |
+|---|---|
+| `SUPER+W` | Close the window |
+| `SUPER+V`, `ALT+F` | Toggle floating |
+| `SUPER+F` | Toggle fullscreen |
+| `SUPER+H` / `J` / `K` / `L` | Focus the window left / below / above / right |
+| `SUPER+SHIFT+H` / `J` / `K` / `L` | Move the window left / below / above / right |
+| `SUPER+Arrows` | Resize the window by 20 px (hold to repeat) |
+| `SUPER+SHIFT+Arrows` | Resize the window by 50 px (hold to repeat) |
+| `ALT+Tab` / `ALT+SHIFT+Tab` | Cycle to the next / previous window |
+| `SUPER+Left drag` | Move the window with the mouse |
+| `SUPER+Right drag` | Resize the window with the mouse |
+
+### Workspaces
+
+| Keys | Action |
+|---|---|
+| `SUPER+1` .. `SUPER+0` | Go to workspace 1..10 |
+| `SUPER+SHIFT+1` .. `SUPER+SHIFT+0` | Move the window to workspace 1..10 |
+| `SUPER+ALT+1` .. `SUPER+ALT+0` | Go to workspace 11..20 |
+| `SUPER+SHIFT+ALT+1` .. `SUPER+SHIFT+ALT+0` | Move the window to workspace 11..20 |
+| `SUPER+Tab` | Previous workspace |
+| `SUPER+Scroll down` / `SUPER+Scroll up` | Next / previous workspace |
+
+### System
+
+| Keys | Action |
+|---|---|
+| `SUPER+Escape` | Lock the screen |
+| `SUPER+T` | Apply the current theme (`theme-switch --apply`) |
+| `SUPER+SHIFT+T` | Pick a theme (`theme-switch --pick`) |
+| `SUPER+M` | Start waybar |
+| `SUPER+N` | Stop waybar |
+
+### Media keys
+
+These also work on the lock screen. Volume and brightness repeat while held.
+
+| Keys | Action |
+|---|---|
+| Volume up / down | Volume ±5% (up to 140%) |
+| Mute | Mute / unmute the output |
+| Mic mute | Mute / unmute the microphone |
+| Brightness up / down | Brightness ±10% |
+| Play/Pause, Next, Previous | Media player control (playerctl) |
+
 ## tmux
 
 Config: `.config/tmux/tmux.conf`, helper scripts in `.config/tmux/scripts/`.
