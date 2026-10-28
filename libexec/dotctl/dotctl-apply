@@ -9,7 +9,8 @@ usage() {
 Usage: dotctl apply [--dry-run] [module...]
 
 Link each module's home/ into \$HOME (dependencies first), then run its
-hooks/link.d/ hooks. No module names means every module.
+hooks/link.d/ hooks. No module names means the modules in
+hosts/<hostname>.conf, or every module when that file does not exist.
 
 Anything in the way is moved to a backup, never deleted ('dotctl backup list').
 
@@ -30,12 +31,7 @@ done
 
 command -v stow >/dev/null || die "GNU Stow is not installed"
 
-if ((${#modules[@]} == 0)); then
-    mapfile -t modules < <(module_all)
-    ((${#modules[@]})) || die "no modules in $DOTCTL_MODULES"
-fi
-
-resolved="$(module_resolve "${modules[@]}")"
+resolved="$(module_selected "${modules[@]}")"
 mapfile -t ordered <<<"$resolved"
 for module in "${ordered[@]}"; do
     manifest_check "$module"

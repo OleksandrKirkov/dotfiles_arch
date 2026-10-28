@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# dotctl-summary: install module packages, set services, run install hooks
+set -euo pipefail
+# shellcheck source=../../lib/dotctl/common.sh
+source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
+
+usage() {
+    cat <<USAGE
+Usage: dotctl install [--dry-run] [module...]
+
+For the selected modules, in order:
+  1. pacman packages (with a full -Syu), AUR packages via yay, flatpak apps,
+     global npm packages
+  2. enable SERVICES, disable SERVICES_DISABLE
+  3. run each module's hooks/install.d/ hooks, dependencies first
+
+No module names means the modules in hosts/<hostname>.conf, or every module
+when that file does not exist. Linking is separate: run 'dotctl apply' after.
+
+  -n, --dry-run   print the commands, change nothing
+USAGE
+}
+
+modules=()
+while (($#)); do
+    case "$1" in
+        -n | --dry-run) DOTCTL_DRY_RUN=1; export DOTCTL_DRY_RUN ;;
+        -h | --help) usage; exit 0 ;;
+        -*) die "unknown option: $1" ;;
+        *) modules+=("$1") ;;
+    esac
+    shift
+done
+
+resolved="$(module_selected "${modules[@]}")"
+mapfile -t ordered <<<"$resolved"
+for module in "${ordered[@]}"; do
+    manifest_check "$module"
+done
+
+dry_run && log "dry run: nothing will change"
+log "installing: ${ordered[*]}"
+
+pkg_install "${ordered[@]}"
+
+failed=0
+for module in "${ordered[@]}"; do
+    hooks_run install "$module" || failed=1
+done
+((failed == 0)) || die "some install hooks failed"

@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# dotctl-summary: check links, packages and services against the modules
+set -euo pipefail
+# shellcheck source=../../lib/dotctl/common.sh
+source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
+
+usage() {
+    cat <<USAGE
+Usage: dotctl doctor [--drift] [module...]
+
+Checks the selected modules (default: hosts/<hostname>.conf, else all):
+  links      every file in home/ is linked into \$HOME
+  packages   declared pacman/AUR packages and flatpak apps are installed
+  services   SERVICES are enabled, SERVICES_DISABLE are not
+  applied    the module was applied at least once
+
+Explicitly installed packages no module declares are counted; --drift lists
+them. They are reported, never a failure.
+
+Exit status: 0 healthy, 1 problems found.
+USAGE
+}
+
+show_drift=0
+modules=()
+while (($#)); do
+    case "$1" in
+        --drift) show_drift=1 ;;
+        -h | --help) usage; exit 0 ;;
+        -*) die "unknown option: $1" ;;
+        *) modules+=("$1") ;;
+    esac
+    shift
+done
+
+resolved="$(module_selected "${modules[@]}")"
+mapfile -t ordered <<<"$resolved"
+for module in "${ordered[@]}"; do
+    manifest_check "$module"
+done
+
+problems=0
+problem() {
+    printf '  %s\n' "$*"
+    problems=$((problems + 1))
+}
+
+section() { printf '%s\n' "$1"; }
+
+section "links"
+for module in "${ordered[@]}"; do
+    pkg="$(module_dir "$module")/home"
+    [[ -d "$pkg" ]] || continue
+    while IFS= read -r -d '' src; do
+        rel="${src#"$pkg"/}"
+        target="$DOTCTL_TARGET/$rel"
+        if [[ ! -L "$target" ]]; then
+            problem "$module: ~/$rel is not linked"
+        elif [[ "$(realpath -m -- "$target")" != "$(realpath -m -- "$src")" ]]; then
+            problem "$module: ~/$rel points to $(readlink -- "$target")"
+        fi
+    done < <(find "$pkg" -mindepth 1 \( -type f -o -type l \) -print0 | sort -z)
+done
+
+section "packages"
+mapfile -t declared < <(pkg_collect PACMAN "${ordered[@]}"; pkg_collect AUR "${ordered[@]}")
+if ((${#declared[@]})); then
+    # pacman -T honours provides (waybar-git satisfies waybar); it prints what is missing.
+    while IFS= read -r name; do
+        if [[ -n "$name" ]]; then problem "not installed: $name"; fi
+    done < <(pacman -T "${declared[@]}" || true)
+fi
+mapfile -t apps < <(pkg_collect FLATPAK "${ordered[@]}")
+if ((${#apps[@]})); then
+    if command -v flatpak >/dev/null; then
+        installed_apps="$(flatpak list --app --columns=application)"
+        for app in "${apps[@]}"; do
+            grep -qxF -- "$app" <<<"$installed_apps" || problem "flatpak not installed: $app"
+        done
+    else
+        problem "flatpak is not installed (${#apps[@]} apps declared)"
+    fi
+fi
+
+section "services"
+while IFS= read -r unit; do
+    [[ -z "$unit" ]] && continue
+    state="$(systemctl is-enabled "$unit" 2>/dev/null || true)"
+    [[ "$state" == enabled ]] || problem "$unit is ${state:-unknown}, want enabled"
+done < <(pkg_collect SERVICES "${ordered[@]}")
+while IFS= read -r unit; do
+    [[ -z "$unit" ]] && continue
+    state="$(systemctl is-enabled "$unit" 2>/dev/null || true)"
+    [[ "$state" != enabled ]] || problem "$unit is enabled, want disabled"
+done < <(pkg_collect SERVICES_DISABLE "${ordered[@]}")
+
+section "applied"
+for module in "${ordered[@]}"; do
+    [[ -n "$(state_applied_at "$module")" ]] || problem "$module was never applied"
+done
+
+section "drift"
+if ((${#declared[@]})); then
+    undeclared="$(pacman -Qqe | grep -vxF -f <(printf '%s\n' "${declared[@]}") || true)"
+else
+    # grep -f with no patterns would match nothing; with an empty one, everything
+    undeclared="$(pacman -Qqe)"
+fi
+count=0
+[[ -z "$undeclared" ]] || count="$(wc -l <<<"$undeclared")"
+printf '  %s explicitly installed package(s) no module declares\n' "$count"
+if ((show_drift && count)); then
+    while IFS= read -r name; do printf '    %s\n' "$name"; done <<<"$undeclared"
+fi
+
+if ((problems)); then
+    printf '\n%d problem(s)\n' "$problems"
+    exit 1
+fi
+printf '\nhealthy\n'

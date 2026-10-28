@@ -54,3 +54,5 @@ source "$DOTCTL_LIB/link.sh"
 source "$DOTCTL_LIB/hooks.sh"
 # shellcheck source=state.sh
 source "$DOTCTL_LIB/state.sh"
+# shellcheck source=pkg.sh
+source "$DOTCTL_LIB/pkg.sh"

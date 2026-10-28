@@ -1,14 +1,27 @@
 # shellcheck shell=bash
-# manifest.sh: read modules/<name>/module.conf and order modules by DEPENDS.
+# manifest.sh: read modules/<name>/module.conf, hosts/<host>.conf, and order
+# modules by DEPENDS.
 #
 # module.conf is plain bash holding data only, sourced in a subshell so a
 # manifest can never change dotctl's own state:
 #
 #   DESCRIPTION="tmux config, scripts and snapshots"
-#   SCOPE=user          # user: linked into $HOME; system: reserved for /etc (not yet supported)
-#   DEPENDS=(zsh)       # modules applied before this one
+#   SCOPE=user              # user: linked into $HOME; system: reserved for /etc (not yet supported)
+#   DEPENDS=(zsh)           # modules handled before this one
+#   PACMAN=(tmux)           # repo packages        (dotctl install)
+#   AUR=(tmux-fingers)      # AUR packages via yay (dotctl install)
+#   FLATPAK=(com.x.App)     # flatpak apps         (dotctl install)
+#   NPM=(eslint_d)          # global npm packages  (dotctl install)
+#   SERVICES=(tlp.service)  # system units to enable
+#   SERVICES_DISABLE=(...)  # system units to disable
+#
+# hosts/<host>.conf picks the modules a machine uses when none are named:
+#
+#   MODULES=(base zsh tmux ...)
+#
+# <host> is $DOTCTL_HOST, default `uname -n`. No host file means every module.
 
-MANIFEST_FIELDS=(DESCRIPTION SCOPE DEPENDS)
+MANIFEST_FIELDS=(DESCRIPTION SCOPE DEPENDS PACMAN AUR FLATPAK NPM SERVICES SERVICES_DISABLE)
 
 module_dir() { printf '%s/%s\n' "$DOTCTL_MODULES" "$1"; }
 
@@ -110,4 +123,34 @@ module_resolve() {
     unset -f _module_visit
     ((${#_order[@]})) && printf '%s\n' "${_order[@]}"
     return 0
+}
+
+dotctl_host() { printf '%s\n' "${DOTCTL_HOST:-$(uname -n)}"; }
+
+host_file() { printf '%s/hosts/%s.conf\n' "$DOTCTL_ROOT" "$(dotctl_host)"; }
+
+# module_selected [module...]: the named modules, else the host's MODULES,
+# else every module; dependencies included, dependencies first.
+module_selected() {
+    local file list
+    if (($#)); then
+        module_resolve "$@"
+        return
+    fi
+    file="$(host_file)"
+    if [[ -f "$file" ]]; then
+        list="$(
+            set +u
+            # shellcheck disable=SC1090
+            source "$file" || exit 1
+            ((${#MODULES[@]})) || exit 2
+            printf '%s\n' "${MODULES[@]}"
+        )" || die "$file: failed to load, or MODULES is empty"
+    else
+        list="$(module_all)"
+        [[ -n "$list" ]] || die "no modules in $DOTCTL_MODULES"
+    fi
+    local -a names
+    mapfile -t names <<<"$list"
+    module_resolve "${names[@]}"
 }

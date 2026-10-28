@@ -19,14 +19,16 @@ export DOTCTL_TARGET="$SANDBOX/home"
 export DOTCTL_STATE="$SANDBOX/state"
 export DOTCTL_HOOKS="$SANDBOX/user-hooks"
 export NO_COLOR=1
+export DOTCTL_HOST=sandbox
 
 passed=0
 failed=0
 
 reset_sandbox() {
-    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS"
+    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks}
     mkdir -p "$ROOT/modules" "$DOTCTL_TARGET"
     cp -r "$REPO/bin" "$REPO/lib" "$REPO/libexec" "$ROOT/"
+    make_stubs
 }
 
 # module <name> [DEPENDS...]: create a fixture module.
@@ -55,7 +57,54 @@ hook() {
     chmod +x "$ROOT/modules/$1/hooks/$2.d/$3"
 }
 
-dotctl() { "$ROOT/bin/dotctl" "$@"; }
+# field <module> <line>: append a manifest line, e.g. 'PACMAN=(tmux fzf)'
+field() { printf '%s\n' "$2" >>"$ROOT/modules/$1/module.conf"; }
+
+# Stubs for the package tools. Calls are appended to $SANDBOX/calls.log;
+# queries answer from $SANDBOX/{missing,explicit,enabled,flatpaks}.
+make_stubs() {
+    local stubs="$SANDBOX/stubs"
+    rm -rf "$stubs"
+    mkdir -p "$stubs"
+    cat >"$stubs/sudo" <<'STUB'
+#!/usr/bin/env bash
+exec "$@"
+STUB
+    cat >"$stubs/pacman" <<STUB
+#!/usr/bin/env bash
+case "\$1" in
+    -T) shift; rc=0
+        for p in "\$@"; do grep -qxF -- "\$p" "$SANDBOX/missing" 2>/dev/null && { echo "\$p"; rc=127; }; done
+        exit "\$rc" ;;
+    -Qqe) cat "$SANDBOX/explicit" 2>/dev/null; exit 0 ;;
+esac
+echo "pacman \$*" >>"$SANDBOX/calls.log"
+STUB
+    cat >"$stubs/systemctl" <<STUB
+#!/usr/bin/env bash
+if [[ "\$1" == is-enabled ]]; then
+    grep -qxF -- "\$2" "$SANDBOX/enabled" 2>/dev/null && { echo enabled; exit 0; }
+    echo disabled; exit 1
+fi
+echo "systemctl \$*" >>"$SANDBOX/calls.log"
+STUB
+    cat >"$stubs/flatpak" <<STUB
+#!/usr/bin/env bash
+[[ "\$1" == list ]] && { cat "$SANDBOX/flatpaks" 2>/dev/null; exit 0; }
+echo "flatpak \$*" >>"$SANDBOX/calls.log"
+STUB
+    cat >"$stubs/yay" <<STUB
+#!/usr/bin/env bash
+echo "yay \$*" >>"$SANDBOX/calls.log"
+STUB
+    cat >"$stubs/npm" <<STUB
+#!/usr/bin/env bash
+echo "npm \$* userconfig=\${NPM_CONFIG_USERCONFIG:-}" >>"$SANDBOX/calls.log"
+STUB
+    chmod +x "$stubs"/*
+}
+
+dotctl() { PATH="$SANDBOX/stubs:$PATH" "$ROOT/bin/dotctl" "$@"; }
 
 # fail <message>: record a failed assertion; the test keeps running so every
 # broken assertion is reported.
@@ -253,6 +302,120 @@ test_backup_restore_refuses_foreign_file() {
     printf 'edited by hand\n' >"$DOTCTL_TARGET/.zshrc"
     if dotctl backup restore "$id"; then fail "restore succeeded"; fi
     [[ "$(cat "$DOTCTL_TARGET/.zshrc")" == "edited by hand" ]] || fail "foreign file overwritten"
+}
+
+test_install_runs_package_tools_in_order() {
+    module base
+    module tmux base
+    module dev
+    field base 'PACMAN=(git stow)'
+    field tmux 'PACMAN=(tmux git)'
+    field tmux 'AUR=(tmux-fingers)'
+    field dev 'FLATPAK=(com.example.App)'
+    field dev 'NPM=(eslint_d)'
+    field dev 'SERVICES=(docker.service)'
+    field dev 'SERVICES_DISABLE=(nvidia-powerd.service)'
+    printf 'prefix=/tmp/npm\n' >"$ROOT/modules/dev/home/.npmrc"
+    hook dev install 50-log
+    hook base install 50-log
+    dotctl install
+    local want
+    want="pacman -Syu --needed --noconfirm git stow tmux
+yay -S --needed --noconfirm tmux-fingers
+flatpak install -y com.example.App
+npm install -g eslint_d userconfig=$ROOT/modules/dev/home/.npmrc
+systemctl enable docker.service
+systemctl disable nvidia-powerd.service"
+    [[ "$(cat "$SANDBOX/calls.log")" == "$want" ]] || fail "calls:" "$(cat "$SANDBOX/calls.log")"
+    # module_all order is alphabetical, dependencies first: base, dev, tmux
+    [[ "$(cat "$SANDBOX/hooks.log")" == $'base:install\ndev:install' ]] || fail "hooks: $(cat "$SANDBOX/hooks.log")"
+}
+
+test_install_dry_run_calls_nothing() {
+    module base
+    field base 'PACMAN=(git)'
+    field base 'SERVICES=(x.service)'
+    hook base install 50-log
+    dotctl install --dry-run
+    [[ ! -e "$SANDBOX/calls.log" ]] || fail "called: $(cat "$SANDBOX/calls.log")"
+    [[ ! -e "$SANDBOX/hooks.log" ]] || fail "hook ran"
+}
+
+test_install_without_packages_calls_nothing() {
+    module zsh
+    dotctl install
+    [[ ! -e "$SANDBOX/calls.log" ]] || fail "called: $(cat "$SANDBOX/calls.log")"
+}
+
+test_host_file_selects_modules() {
+    module zsh
+    module tmux zsh
+    module waybar
+    file zsh .zshrc "z"
+    file tmux .tmux "t"
+    file waybar .waybar "w"
+    mkdir -p "$ROOT/hosts"
+    printf 'MODULES=(tmux)\n' >"$ROOT/hosts/sandbox.conf"
+    dotctl apply
+    links_to "$DOTCTL_TARGET/.zshrc" zsh .zshrc
+    links_to "$DOTCTL_TARGET/.tmux" tmux .tmux
+    [[ ! -e "$DOTCTL_TARGET/.waybar" ]] || fail "waybar applied though not in host file"
+    DOTCTL_HOST=other dotctl apply
+    links_to "$DOTCTL_TARGET/.waybar" waybar .waybar
+}
+
+test_host_file_without_modules_fails() {
+    module zsh
+    mkdir -p "$ROOT/hosts"
+    printf 'MODULES=()\n' >"$ROOT/hosts/sandbox.conf"
+    local out
+    if out="$(dotctl apply 2>&1)"; then fail "apply succeeded"; fi
+    [[ "$out" == *"MODULES is empty"* ]] || fail "got: $out"
+}
+
+test_doctor_healthy() {
+    module base
+    file base .gitconfig "g"
+    field base 'PACMAN=(git)'
+    field base 'FLATPAK=(com.example.App)'
+    field base 'SERVICES=(a.service)'
+    field base 'SERVICES_DISABLE=(b.service)'
+    printf 'a.service\n' >"$SANDBOX/enabled"
+    printf 'com.example.App\n' >"$SANDBOX/flatpaks"
+    printf 'git\nhtop\n' >"$SANDBOX/explicit"
+    dotctl apply
+    local out
+    out="$(dotctl doctor --drift)" || fail "doctor failed:" "$out"
+    [[ "$out" == *"1 explicitly installed package(s) no module declares"* ]] || fail "drift count:" "$out"
+    [[ "$out" == *"    htop"* ]] || fail "drift list:" "$out"
+    [[ "$out" == *healthy ]] || fail "$out"
+}
+
+test_doctor_reports_problems() {
+    module base
+    file base .gitconfig "g"
+    field base 'PACMAN=(git)'
+    field base 'FLATPAK=(com.example.App)'
+    field base 'SERVICES=(a.service)'
+    field base 'SERVICES_DISABLE=(b.service)'
+    printf 'git\n' >"$SANDBOX/missing"
+    printf 'b.service\n' >"$SANDBOX/enabled"
+    local out
+    if out="$(dotctl doctor)"; then fail "doctor passed"; fi
+    for want in "base: ~/.gitconfig is not linked" "not installed: git" "flatpak not installed: com.example.App" \
+        "a.service is disabled, want enabled" "b.service is enabled, want disabled" "base was never applied" \
+        "6 problem(s)"; do
+        [[ "$out" == *"$want"* ]] || fail "missing '$want' in:" "$out"
+    done
+}
+
+test_doctor_drift_without_declared_packages() {
+    module zsh
+    printf 'git\nhtop\n' >"$SANDBOX/explicit"
+    dotctl apply
+    local out
+    out="$(dotctl doctor)" || fail "doctor failed:" "$out"
+    [[ "$out" == *"2 explicitly installed package(s)"* ]] || fail "$out"
 }
 
 for t in $(declare -F | awk '$3 ~ /^test_/ { print $3 }'); do
