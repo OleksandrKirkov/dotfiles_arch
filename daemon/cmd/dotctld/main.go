@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/OleksandrKirkov/dotfiles_arch/daemon/internal/bus"
+	"github.com/OleksandrKirkov/dotfiles_arch/daemon/internal/monitor"
 )
 
 func main() {
@@ -38,7 +39,16 @@ func run() error {
 	flag.StringVar(&socketPath, "socket", socketPath, "Unix socket to listen on")
 	flag.StringVar(&statePath, "state", statePath, "file retained messages are saved to (empty: memory only)")
 	debug := flag.Bool("debug", false, "log every publish")
+	alertCfg := monitor.DefaultConfig()
+	alerts := flag.Bool("alerts", true, `publish battery and RAM alerts on the "alerts" topic`)
+	flag.IntVar(&alertCfg.BatteryLowPercent, "battery-low", alertCfg.BatteryLowPercent, "alert when discharging below this percent")
+	ramHighGB := flag.Float64("ram-high-gb", float64(alertCfg.RAMHighBytes)/1e9, "alert when used RAM exceeds this many GB (10^9 bytes)")
+	flag.DurationVar(&alertCfg.Interval, "alert-interval", alertCfg.Interval, "time between alert checks")
 	flag.Parse()
+	if *ramHighGB <= 0 || alertCfg.BatteryLowPercent < 0 || alertCfg.Interval <= 0 {
+		return errors.New("-ram-high-gb and -alert-interval must be positive, -battery-low not negative")
+	}
+	alertCfg.RAMHighBytes = uint64(*ramHighGB * 1e9)
 
 	level := slog.LevelInfo
 	if *debug {
@@ -68,6 +78,9 @@ func run() error {
 
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
+	if *alerts {
+		go monitor.New(alertCfg, store, log).Run(ctx)
+	}
 	log.Info("listening", "socket", socketPath, "state", statePath, "topics", len(store.List()))
 
 	select {

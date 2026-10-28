@@ -75,6 +75,27 @@ Pending updates. Published by `dotctl updates --publish`: hourly by `dotctl-upda
 
 A count is `null` when it cannot be known: no upstream, tool missing, or the check failed.
 
+### `alerts`
+
+Conditions that need attention now. Published by `dotctld` itself, which checks every 30 s and publishes only
+when the set of active alerts changes: one alert per threshold crossing, re-armed once the value recovers.
+Its text is fixed when it is raised.
+
+```json
+{"active": [
+  {"id": "battery.low", "urgency": "critical", "icon": "battery-caution",
+   "summary": "Low battery", "body": "9% left. Plug in the charger."}
+]}
+```
+
+| id | raised while | flag (default) |
+| --- | --- | --- |
+| `battery.low` | the first battery is discharging below the threshold | `-battery-low` (10 %) |
+| `memory.high` | MemTotal − MemAvailable is above the threshold | `-ram-high-gb` (28 GB, 10^9 bytes) |
+
+`-alert-interval` (30s) sets the check period; `-alerts=false` turns the checks off.
+`dotctl notify-alerts` (module `dunst`) turns new alerts into desktop notifications.
+
 ## Adding a topic
 
 1. Pick a name no other topic uses; prefer one word, use `.` for a family (`power.profile`).

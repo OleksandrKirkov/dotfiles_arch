@@ -127,7 +127,7 @@ migration() {
 
 # start_daemon: run the dotctld built for this test run on $DOTCTL_BUS.
 start_daemon() {
-    "$SANDBOX/dotctld" >>"$SANDBOX/daemon.log" 2>&1 &
+    "$SANDBOX/dotctld" -alerts=false >>"$SANDBOX/daemon.log" 2>&1 &
     echo $! >"$SANDBOX/daemon.pid"
     for _ in $(seq 50); do
         [[ -S "$DOTCTL_BUS" ]] && return 0
