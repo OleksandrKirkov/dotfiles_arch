@@ -44,7 +44,6 @@ hyprpicker
 hyprsunset
 ifuse
 imv
-iwd
 jdk-openjdk
 jdk17-openjdk
 jdk21-openjdk

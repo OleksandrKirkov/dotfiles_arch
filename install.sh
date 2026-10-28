@@ -86,7 +86,6 @@ PACMAN_PACKAGES=(
 
     networkmanager
     network-manager-applet
-    iwd
     bluez
     bluez-utils
     udiskie
@@ -130,6 +129,10 @@ PACMAN_PACKAGES=(
 )
 
 sudo pacman -S --needed --noconfirm "${PACMAN_PACKAGES[@]}"
+
+# NetworkManager owns Wi-Fi (nmtui) through its default wpa_supplicant backend; iwd is not installed
+echo "Enabling NetworkManager..."
+sudo systemctl enable NetworkManager.service
 
 # The driver preserves video memory across sleep only through these units; without them resume shows a black screen
 echo "Enabling NVIDIA suspend/resume services..."
