@@ -32,9 +32,11 @@ dotctl backup add <path>       # copy a file into a backup (migrations call this
 dotctl backup restore <id>     # put them back
 dotctl bus watch theme         # dotctld topics (see docs/bus.md)
 dotctl updates                 # pending repo, pacman and AUR updates (module bus)
+dotctl menu [power|bluetooth|theme|updates]   # rofi menus (module rofi)
 ```
 
-A module can add commands: `modules/<name>/libexec/dotctl-<command>` becomes `dotctl <command>`.
+A module can add commands: `modules/<name>/libexec/dotctl-<command>` becomes `dotctl <command>`, and menus:
+`modules/<name>/menus/<menu>` becomes `dotctl menu <menu>`.
 
 With no module names, commands use `hosts/<hostname>.conf` (`MODULES=(...)`), or every module when this
 machine has no host file.
@@ -47,6 +49,8 @@ modules/<name>/
                        PACMAN=(...), AUR=(...), FLATPAK=(...), NPM=(...),
                        SERVICES=(...), SERVICES_DISABLE=(...)
   home/                linked into ~ with stow --no-folding
+  libexec/dotctl-<cmd> a dotctl command
+  menus/<menu>         a rofi menu (sources modules/rofi/lib/menu.sh for the shared picker)
   hooks/install.d/     run by dotctl install, after packages and services
   hooks/link.d/        run by dotctl apply, after the module is linked
   hooks/update.d/      run by dotctl update, last
@@ -58,7 +62,9 @@ to migrate (a fresh install), copy any file it changes with `dotctl backup add` 
 for a person to decide. Ran migrations are recorded in `~/.local/state/dotctl/migrations`.
 
 Anything already at a module's target path is moved to `~/.local/state/dotctl/backups/<id>/`, never deleted.
-Your own hooks go in `~/.config/dotctl/hooks/<event>.d/`.
+Each apply records what a module linked (`~/.local/state/dotctl/links/<module>`); when a module stops
+shipping a file, the next apply removes the link that now points at nothing. Your own hooks go in
+`~/.config/dotctl/hooks/<event>.d/`.
 
 `themes/` holds theme packages read by `theme-switch` (module `theme`).
 
@@ -67,6 +73,17 @@ Your own hooks go in `~/.config/dotctl/hooks/<event>.d/`.
 `dotctld` (source in `daemon/`, module `bus`) keeps the last value of every topic and streams changes to the
 desktop tools, so they react to events instead of polling. Topics, API and the rules for adding one:
 [docs/bus.md](docs/bus.md).
+
+How the tools use it:
+
+| Tool | Reads | Through |
+| --- | --- | --- |
+| waybar `custom/updates` | `updates` | `dotctl bus watch --format ~/.config/waybar/bus/updates.jq updates` |
+| dunst | `alerts` (battery, RAM) | `dotctl-notify.service` → `dotctl notify-alerts` → `notify-send` |
+| rofi `dotctl menu updates` | `updates` | `dotctl bus get` |
+
+Everything else on the bar (battery, network, audio, bluetooth, workspaces) uses waybar's own event-driven
+modules. Every tool keeps working when `dotctld` is down; the bus-backed parts just show nothing.
 
 Tests: `tests/dotctl.sh` (runs in a temporary directory, never touches `~`; builds dotctld, so it needs Go) and
 `go -C daemon test -race ./...`.
