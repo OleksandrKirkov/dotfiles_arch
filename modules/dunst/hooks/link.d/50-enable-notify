@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Start the alerts notifier (dotctld comes from the bus module, linked first).
+set -euo pipefail
+if [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
+    echo "no user session; enable later: systemctl --user enable --now dotctl-notify.service" >&2
+    exit 0
+fi
+systemctl --user daemon-reload
+systemctl --user enable --now dotctl-notify.service

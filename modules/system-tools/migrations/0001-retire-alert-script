@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# dotctld now raises the battery/RAM alerts (topic "alerts") and dunst shows
+# them; the system-alerts script is gone. Stop a copy still running from an
+# older login and remove its link, which now points at nothing.
+set -euo pipefail
+pkill -f -- '/system-alerts$' || true
+link="$DOTCTL_TARGET/.local/bin/system-alerts"
+if [[ -L "$link" && ! -e "$link" ]]; then
+    case "$(realpath -m -- "$link")" in
+        "$DOTCTL_ROOT"/*) rm -- "$link" && echo "removed dangling $link" ;;
+    esac
+fi

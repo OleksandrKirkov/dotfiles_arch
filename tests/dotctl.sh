@@ -104,6 +104,15 @@ STUB
 [[ "\$1" == -Qua ]] && { cat "$SANDBOX/aur-updates" 2>/dev/null; exit 1; }
 echo "yay \$*" >>"$SANDBOX/calls.log"
 STUB
+    cat >"$stubs/notify-send" <<STUB
+#!/usr/bin/env bash
+echo "notify-send \$*" >>"$SANDBOX/calls.log"
+STUB
+    cat >"$stubs/pkill" <<STUB
+#!/usr/bin/env bash
+echo "pkill \$*" >>"$SANDBOX/calls.log"
+exit 1
+STUB
     cat >"$stubs/checkupdates" <<STUB
 #!/usr/bin/env bash
 [[ -s "$SANDBOX/repo-updates" ]] || exit 2
@@ -859,6 +868,43 @@ test_bus_module_builds_and_enables_dotctld() {
     links_to "$DOTCTL_TARGET/.config/systemd/user/dotctld.service" bus .config/systemd/user/dotctld.service
     [[ "$(cat "$SANDBOX/calls.log")" == $'systemctl --user daemon-reload\nsystemctl --user enable --now dotctld.service dotctl-updates.timer' ]] \
         || fail "calls: $(cat "$SANDBOX/calls.log")"
+}
+
+test_notify_alerts_shows_each_new_alert_once() {
+    module bus
+    real_module dunst
+    start_daemon
+    local low='{"id":"battery.low","urgency":"critical","icon":"battery-caution","summary":"Low battery","body":"9% left."}'
+    local ram='{"id":"memory.high","urgency":"critical","icon":"dialog-warning","summary":"High RAM usage","body":"30 GB."}'
+    dotctl bus publish alerts "{\"active\":[$low]}"
+    dotctl notify-alerts &
+    local notifier=$!
+    wait_for_lines "$SANDBOX/calls.log" 1
+    dotctl bus publish alerts "{\"active\":[$low,$ram]}"   # only the RAM alert is new
+    wait_for_lines "$SANDBOX/calls.log" 2
+    dotctl bus publish alerts '{"active":[]}'                # both clear
+    dotctl bus publish alerts "{\"active\":[$low]}"         # battery crosses again
+    wait_for_lines "$SANDBOX/calls.log" 3
+    stop_daemon
+    for _ in $(seq 50); do kill -0 "$notifier" 2>/dev/null || break; sleep 0.1; done
+    if kill -0 "$notifier" 2>/dev/null; then kill "$notifier"; fail "notifier kept running after dotctld stopped"; fi
+    local want
+    want="notify-send -u critical -a dotctl -i battery-caution Low battery 9% left.
+notify-send -u critical -a dotctl -i dialog-warning High RAM usage 30 GB.
+notify-send -u critical -a dotctl -i battery-caution Low battery 9% left."
+    [[ "$(cat "$SANDBOX/calls.log")" == "$want" ]] || fail "calls:" "$(cat "$SANDBOX/calls.log")"
+}
+
+test_retire_alert_script_migration() {
+    module system-tools
+    real_migration system-tools 0001-retire-alert-script
+    mkdir -p "$DOTCTL_TARGET/.local/bin"
+    ln -s "$ROOT/.local/bin/system-alerts" "$DOTCTL_TARGET/.local/bin/system-alerts"   # dangling, ours
+    ln -s /elsewhere/gone "$DOTCTL_TARGET/.local/bin/other"                            # dangling, not ours
+    dotctl migrate
+    [[ ! -L "$DOTCTL_TARGET/.local/bin/system-alerts" ]] || fail "dangling repo link left"
+    [[ -L "$DOTCTL_TARGET/.local/bin/other" ]] || fail "removed a link that is not ours"
+    [[ "$(cat "$SANDBOX/calls.log")" == "pkill -f -- /system-alerts\$" ]] || fail "calls: $(cat "$SANDBOX/calls.log")"
 }
 
 command -v go >/dev/null || { echo "tests need go to build dotctld" >&2; exit 1; }

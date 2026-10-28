@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# dotctl-summary: show a desktop notification for each new alert on the bus
+set -euo pipefail
+# shellcheck source=../../../lib/dotctl/common.sh
+source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
+
+case "${1:-}" in
+    -h | --help)
+        cat <<USAGE
+Usage: dotctl notify-alerts
+
+Watch the bus topic "alerts" (docs/bus.md) and notify-send every alert that
+was not active in the previous message. An alert that clears and comes back
+is shown again. Runs until dotctld stops; dotctl-notify.service restarts it.
+USAGE
+        exit 0
+        ;;
+    "") ;;
+    *) die "unknown argument: $1" ;;
+esac
+
+declare -A shown=()
+while IFS= read -r data; do
+    unset now
+    declare -A now=()
+    while IFS=$'\t' read -r id urgency icon summary body; do
+        [[ -n "$id" ]] || continue
+        now[$id]=1
+        if [[ -z "${shown[$id]:-}" ]]; then
+            notify-send -u "$urgency" -a dotctl -i "$icon" "$summary" "$body" || warn "notify-send failed for $id"
+        fi
+    done < <(jq -r '.active[]? | [.id, .urgency, .icon, .summary, .body] | @tsv' <<<"$data")
+    shown=()
+    for id in "${!now[@]}"; do shown[$id]=1; done
+done < <(bus_watch 1 alerts)

@@ -1,0 +1,12 @@
+[Unit]
+Description=Desktop notifications for dotctl bus alerts
+Wants=dotctld.service
+After=dotctld.service
+
+[Service]
+ExecStart=%h/.local/bin/dotctl notify-alerts
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
