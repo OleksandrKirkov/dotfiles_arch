@@ -8,34 +8,43 @@ cd ~/dotfiles_arch
 ./install.sh
 ```
 
-`install.sh` installs packages, links the repo root into `~` with `stow .`, then links every module with
-`dotctl apply`.
+`install.sh` runs `dotctl install` (packages, services, install hooks), `dotctl apply` (links), then
+`theme-switch --apply`.
 
 ## dotctl
 
 `dotctl` turns the repo into modules. It is linked to `~/.local/bin/dotctl`.
 
 ```sh
-dotctl list                  # modules, scope, last applied
-dotctl apply --dry-run tmux  # show what would change
-dotctl apply                 # link every module, dependencies first
-dotctl backup list           # files dotctl moved out of the way
-dotctl backup restore <id>   # put them back
+dotctl list                    # modules, scope, last applied
+dotctl install --dry-run       # packages, services and install hooks it would run
+dotctl install                 # install them
+dotctl apply --dry-run tmux    # show what linking would change
+dotctl apply                   # link modules, dependencies first
+dotctl doctor [--drift]        # links, packages, services; --drift lists undeclared packages
+dotctl backup list             # files dotctl moved out of the way
+dotctl backup restore <id>     # put them back
 ```
+
+With no module names, commands use `hosts/<hostname>.conf` (`MODULES=(...)`), or every module when this
+machine has no host file.
 
 A module is a directory under `modules/`:
 
 ```
 modules/<name>/
-  module.conf          DESCRIPTION, SCOPE=user, DEPENDS=(other modules)
+  module.conf          DESCRIPTION, SCOPE=user, DEPENDS=(...),
+                       PACMAN=(...), AUR=(...), FLATPAK=(...), NPM=(...),
+                       SERVICES=(...), SERVICES_DISABLE=(...)
   home/                linked into ~ with stow --no-folding
-  hooks/<event>.d/     executables run in name order after the event (event: link)
+  hooks/install.d/     run by dotctl install, after packages and services
+  hooks/link.d/        run by dotctl apply, after the module is linked
 ```
 
 Anything already at a module's target path is moved to `~/.local/state/dotctl/backups/<id>/`, never deleted.
-Links left by the old repo-root `stow .` are replaced. Your own hooks go in `~/.config/dotctl/hooks/<event>.d/`.
+Your own hooks go in `~/.config/dotctl/hooks/<event>.d/`.
 
-Configs not yet moved into `modules/` are still linked by `stow .` from the repo root.
+`themes/` holds theme packages read by `theme-switch` (module `theme`).
 
 Tests: `tests/dotctl.sh` (runs in a temporary directory, never touches `~`).
 

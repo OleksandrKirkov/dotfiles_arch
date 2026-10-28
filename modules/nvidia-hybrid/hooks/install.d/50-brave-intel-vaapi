@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Brave renders on the Intel iGPU; pin its VAAPI driver so video decode never picks NVIDIA.
+set -euo pipefail
+flatpak override --user --env=LIBVA_DRIVER_NAME=iHD --unset-env=GBM_BACKEND com.brave.Browser
