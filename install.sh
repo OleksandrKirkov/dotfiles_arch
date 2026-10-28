@@ -35,6 +35,11 @@ echo "Linking modules..."
 echo "Selecting the default theme..."
 "$HOME/.local/bin/theme-switch" --apply
 
+# Migrations are no-ops on a fresh install; running them records them, so a
+# later 'dotctl update' only runs the ones added after today.
+echo "Running migrations..."
+"$REPO/bin/dotctl" migrate
+
 echo "Removing empty directories..."
 find "$HOME/.config" -type d -empty -delete
 
