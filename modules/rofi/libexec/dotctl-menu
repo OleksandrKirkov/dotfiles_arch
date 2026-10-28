@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# dotctl-summary: open a rofi menu (power, bluetooth, theme, updates, ...)
+set -euo pipefail
+# shellcheck source=../../../lib/dotctl/common.sh
+source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
+# shellcheck source=../lib/menu.sh
+source "$DOTCTL_ROOT/modules/rofi/lib/menu.sh"
+
+# Menus are executables named modules/<module>/menus/<name>; any module can add one.
+menu_paths() {
+    local path
+    for path in "$DOTCTL_MODULES"/*/menus/*; do
+        [[ -f "$path" && -x "$path" ]] && printf '%s\n' "$path"
+    done
+    return 0
+}
+
+case "${1:-}" in
+    -h | --help)
+        printf 'Usage: dotctl menu [<name>]\n\nMenus:\n'
+        menu_paths | sed 's|.*/||; s|^|  |'
+        printf '\nWithout a name, pick a menu first. Any module can add modules/<module>/menus/<name>.\n'
+        exit 0
+        ;;
+esac
+
+name="${1:-}"
+if [[ -z "$name" ]]; then
+    name="$(menu_paths | sed 's|.*/||' | menu_pick menu)" || exit 0
+fi
+[[ "$name" =~ ^[a-z][a-z0-9-]*$ ]] || die "invalid menu name: $name"
+path="$(menu_paths | grep -m1 "/menus/$name\$" || true)"
+[[ -n "$path" ]] || die "no menu named '$name' (see 'dotctl menu --help')"
+shift || true
+exec "$path" "$@"

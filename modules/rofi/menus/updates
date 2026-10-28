@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Pending updates from the bus (topic "updates"): update now, or check again.
+set -euo pipefail
+# shellcheck source=../lib/menu.sh
+source "$DOTCTL_ROOT/modules/rofi/lib/menu.sh"
+dotctl="$DOTCTL_ROOT/bin/dotctl"
+
+summary="unknown"
+if data="$("$dotctl" bus get --data updates 2>/dev/null)"; then
+    summary="$(jq -r '[ "pacman \(.packages // "?")", "AUR \(.aur // "?")", "repo \(.repo // "?")" ] | join(" · ")' <<<"$data")"
+fi
+choice="$(printf '%s\n' "  Update now ($summary)" "  Check again" | menu_pick updates)" || exit 0
+case "$choice" in
+    *"Update now"*) menu_terminal "$dotctl" update ;;
+    *"Check again"*) "$dotctl" updates --publish >/dev/null ;;
+esac
+exit 0

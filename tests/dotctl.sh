@@ -20,6 +20,7 @@ export DOTCTL_STATE="$SANDBOX/state"
 export DOTCTL_HOOKS="$SANDBOX/user-hooks"
 export NO_COLOR=1
 export DOTCTL_HOST=sandbox
+export DOTCTL_MENU_PICKER="$SANDBOX/stubs/picker" TERMINAL=terminal
 export DOTCTL_BUS="$SANDBOX/run/bus.sock"
 export DOTCTL_BUS_STATE="$SANDBOX/bus.json"
 unset XDG_STATE_HOME
@@ -28,7 +29,7 @@ passed=0
 failed=0
 
 reset_sandbox() {
-    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker,installed,required-by,nm,run,bus.json,watch.out,aur-updates,repo-updates}
+    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker,installed,required-by,nm,run,bus.json,watch.out,aur-updates,repo-updates,picks,menu.log}
     mkdir -p "$ROOT/modules" "$DOTCTL_TARGET"
     cp -r "$REPO/bin" "$REPO/lib" "$REPO/libexec" "$ROOT/"
     make_stubs
@@ -113,6 +114,25 @@ STUB
 echo "pkill \$*" >>"$SANDBOX/calls.log"
 exit 1
 STUB
+    # picker: logs the prompt and entries, prints the first entry containing the
+    # next line of $SANDBOX/picks (consumed); no picks left = cancelled
+    cat >"$stubs/picker" <<STUB
+#!/usr/bin/env bash
+entries="\$(cat)"
+printf 'prompt: %s\n%s\n' "\$1" "\$entries" >>"$SANDBOX/menu.log"
+pick="\$(head -n1 "$SANDBOX/picks" 2>/dev/null)"
+[[ -n "\$pick" ]] || exit 1
+sed -i 1d "$SANDBOX/picks"
+grep -F -m1 -- "\$pick" <<<"\$entries"
+STUB
+    local tool
+    for tool in loginctl bluetoothctl rfkill terminal; do
+        cat >"$stubs/$tool" <<STUB
+#!/usr/bin/env bash
+[[ "$tool \$1" == "bluetoothctl show" ]] && { echo "Powered: no"; exit 0; }
+echo "$tool \$*" >>"$SANDBOX/calls.log"
+STUB
+    done
     cat >"$stubs/checkupdates" <<STUB
 #!/usr/bin/env bash
 [[ -s "$SANDBOX/repo-updates" ]] || exit 2
@@ -905,6 +925,61 @@ test_retire_alert_script_migration() {
     [[ ! -L "$DOTCTL_TARGET/.local/bin/system-alerts" ]] || fail "dangling repo link left"
     [[ -L "$DOTCTL_TARGET/.local/bin/other" ]] || fail "removed a link that is not ours"
     [[ "$(cat "$SANDBOX/calls.log")" == "pkill -f -- /system-alerts\$" ]] || fail "calls: $(cat "$SANDBOX/calls.log")"
+}
+
+# picks <entry>...: the menu choices the picker stub makes, in order
+picks() { printf '%s\n' "$@" >"$SANDBOX/picks"; }
+
+test_menu_lists_and_dispatches() {
+    real_module rofi
+    local out
+    out="$(dotctl menu --help)"
+    [[ "$out" == *power* && "$out" == *bluetooth* && "$out" == *updates* ]] || fail "$out"
+    if dotctl menu nope 2>/dev/null; then fail "unknown menu accepted"; fi
+    picks power Lock
+    dotctl menu
+    [[ "$(cat "$SANDBOX/calls.log")" == "loginctl lock-session" ]] || fail "calls: $(cat "$SANDBOX/calls.log")"
+}
+
+test_power_menu_confirms_destructive_entries() {
+    real_module rofi
+    picks Suspend
+    dotctl menu power
+    picks Reboot No
+    dotctl menu power
+    picks "Shut down" Yes
+    dotctl menu power
+    picks "Log out" Yes
+    XDG_SESSION_ID=7 dotctl menu power
+    picks Reboot   # cancelled at the confirmation
+    dotctl menu power
+    [[ "$(cat "$SANDBOX/calls.log")" == $'systemctl suspend\nsystemctl poweroff\nloginctl terminate-session 7' ]] \
+        || fail "calls: $(cat "$SANDBOX/calls.log")"
+    dotctl menu power   # cancelled outright: exit 0, nothing run
+}
+
+test_updates_menu() {
+    module base
+    module dev
+    real_module bus
+    real_module rofi
+    start_daemon
+    dotctl bus publish updates '{"repo":0,"packages":3,"aur":1,"checked":"x"}'
+    picks "Update now"
+    dotctl menu updates
+    grep -q 'Update now (pacman 3 · AUR 1 · repo 0)' "$SANDBOX/menu.log" || fail "menu: $(cat "$SANDBOX/menu.log")"
+    grep -q "^terminal -e bash -c .* $ROOT/bin/dotctl update\$" "$SANDBOX/calls.log" || fail "calls: $(cat "$SANDBOX/calls.log")"
+    printf 'linux 1 -> 2\n' >"$SANDBOX/repo-updates"
+    picks "Check again"
+    dotctl menu updates
+    [[ "$(dotctl bus get --data updates | jq .packages)" == 1 ]] || fail "not rechecked: $(dotctl bus get updates)"
+}
+
+test_bluetooth_menu_powers_on() {
+    real_module rofi
+    picks "Power: off"
+    dotctl menu bluetooth
+    grep -qx 'bluetoothctl power on' "$SANDBOX/calls.log" || fail "calls: $(cat "$SANDBOX/calls.log")"
 }
 
 command -v go >/dev/null || { echo "tests need go to build dotctld" >&2; exit 1; }

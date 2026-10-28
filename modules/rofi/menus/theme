@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Pick any installed or base46 theme (theme-switch owns the list and the switch).
+set -euo pipefail
+exec "$DOTCTL_TARGET/.local/bin/theme-switch" --pick

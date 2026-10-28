@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Lock, suspend, log out, reboot or shut down. The last three ask first.
+set -euo pipefail
+# shellcheck source=../lib/menu.sh
+source "$DOTCTL_ROOT/modules/rofi/lib/menu.sh"
+
+choice="$(printf '%s\n' "  Lock" "  Suspend" "󰍃  Log out" "  Reboot" "  Shut down" | menu_pick power)" || exit 0
+case "$choice" in
+    *Lock) loginctl lock-session ;;
+    *Suspend) systemctl suspend ;;
+    *"Log out") menu_confirm "Log out?" && loginctl terminate-session "${XDG_SESSION_ID:-self}" ;;
+    *Reboot) menu_confirm "Reboot?" && systemctl reboot ;;
+    *"Shut down") menu_confirm "Shut down?" && systemctl poweroff ;;
+esac
+exit 0
