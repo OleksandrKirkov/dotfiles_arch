@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# dotctl-summary: count pending repo, pacman and AUR updates; --publish sends them to the bus
+set -euo pipefail
+# shellcheck source=../../../lib/dotctl/common.sh
+source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
+
+usage() {
+    cat <<USAGE
+Usage: dotctl updates [--publish] [--no-fetch]
+
+Print the pending updates as JSON, the data of the 'updates' bus topic:
+
+  {"repo": N, "packages": N, "aur": N, "checked": "<ISO time>"}
+
+  repo       commits on the repo's upstream not pulled yet (git fetch first)
+  packages   pacman updates (checkupdates, from pacman-contrib)
+  aur        AUR updates (yay -Qua)
+
+A count is null when it cannot be known (no upstream, tool missing, failed).
+
+  --publish    also publish to the bus (exit 3 when dotctld is not running)
+  --no-fetch   count repo commits against the last fetch
+USAGE
+}
+
+publish=0
+fetch=1
+while (($#)); do
+    case "$1" in
+        --publish) publish=1 ;;
+        --no-fetch) fetch=0 ;;
+        -h | --help) usage; exit 0 ;;
+        *) die "unknown argument: $1" ;;
+    esac
+    shift
+done
+
+count_lines() { if [[ -z "$1" ]]; then echo 0; else wc -l <<<"$1"; fi; }
+
+repo=null
+if git -C "$DOTCTL_ROOT" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
+    if ((fetch == 0)) || git -C "$DOTCTL_ROOT" fetch --quiet 2>/dev/null; then
+        repo="$(git -C "$DOTCTL_ROOT" rev-list --count 'HEAD..@{upstream}')"
+    fi
+fi
+
+packages=null
+if command -v checkupdates >/dev/null; then
+    # checkupdates: exit 0 with updates listed, 2 when there are none, else an error
+    status=0
+    out="$(checkupdates 2>/dev/null)" || status=$?
+    case "$status" in
+        0) packages="$(count_lines "$out")" ;;
+        2) packages=0 ;;
+    esac
+fi
+
+aur=null
+if command -v yay >/dev/null; then
+    # yay -Qua exits 1 when nothing is out of date
+    out="$(yay -Qua 2>/dev/null)" || true
+    aur="$(count_lines "$out")"
+fi
+
+json="$(jq -cn --argjson repo "$repo" --argjson packages "$packages" --argjson aur "$aur" \
+    --arg checked "$(date --iso-8601=seconds)" \
+    '{repo: $repo, packages: $packages, aur: $aur, checked: $checked}')"
+printf '%s\n' "$json"
+if ((publish)); then
+    bus_call PUT /v1/topics/updates "$json" >/dev/null
+fi

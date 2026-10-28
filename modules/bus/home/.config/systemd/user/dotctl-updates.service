@@ -1,0 +1,8 @@
+[Unit]
+Description=Count pending repo, pacman and AUR updates for the dotctl bus
+Wants=dotctld.service
+After=dotctld.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/dotctl updates --publish

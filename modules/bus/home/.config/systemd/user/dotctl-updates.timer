@@ -1,0 +1,10 @@
+[Unit]
+Description=Hourly dotctl updates check
+
+[Timer]
+OnStartupSec=2min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

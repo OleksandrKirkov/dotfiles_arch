@@ -28,7 +28,7 @@ passed=0
 failed=0
 
 reset_sandbox() {
-    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker,installed,required-by,nm,run,bus.json,watch.out}
+    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker,installed,required-by,nm,run,bus.json,watch.out,aur-updates,repo-updates}
     mkdir -p "$ROOT/modules" "$DOTCTL_TARGET"
     cp -r "$REPO/bin" "$REPO/lib" "$REPO/libexec" "$ROOT/"
     make_stubs
@@ -101,7 +101,13 @@ echo "flatpak \$*" >>"$SANDBOX/calls.log"
 STUB
     cat >"$stubs/yay" <<STUB
 #!/usr/bin/env bash
+[[ "\$1" == -Qua ]] && { cat "$SANDBOX/aur-updates" 2>/dev/null; exit 1; }
 echo "yay \$*" >>"$SANDBOX/calls.log"
+STUB
+    cat >"$stubs/checkupdates" <<STUB
+#!/usr/bin/env bash
+[[ -s "$SANDBOX/repo-updates" ]] || exit 2
+cat "$SANDBOX/repo-updates"
 STUB
     cat >"$stubs/npm" <<STUB
 #!/usr/bin/env bash
@@ -144,6 +150,13 @@ wait_for_lines() {
         sleep 0.1
     done
     fail "$1 has $(wc -l <"$1" 2>/dev/null || echo 0) lines, want $2"
+}
+
+# real_module <module>: copy a whole module from this repo into the sandbox
+# (replacing a fixture of the same name).
+real_module() {
+    rm -rf "$ROOT/modules/$1"
+    cp -r "$REPO/modules/$1" "$ROOT/modules/$1"
 }
 
 # real_migration <module> <name>: copy a migration from this repo into the sandbox.
@@ -787,6 +800,65 @@ test_bus_state_survives_restart() {
     stop_daemon
     start_daemon
     [[ "$(dotctl bus get --data theme)" == '"a"' ]] || fail "theme lost on restart"
+}
+
+test_updates_counts() {
+    module base
+    module dev
+    real_module bus
+    printf 'linux 1 -> 2\nmesa 1 -> 2\n' >"$SANDBOX/repo-updates"
+    printf 'yay-bin 1 -> 2\n' >"$SANDBOX/aur-updates"
+    local out
+    out="$(dotctl updates)"
+    [[ "$(jq -c 'del(.checked)' <<<"$out")" == '{"repo":null,"packages":2,"aur":1}' ]] || fail "$out"
+    rm "$SANDBOX/repo-updates" "$SANDBOX/aur-updates"
+    out="$(dotctl updates)"
+    [[ "$(jq -c 'del(.checked)' <<<"$out")" == '{"repo":null,"packages":0,"aur":0}' ]] || fail "$out"
+}
+
+test_updates_counts_repo_commits() {
+    module base
+    module dev
+    real_module bus
+    git_fixture
+    push_migration base 0001-x
+    local out
+    out="$(dotctl updates)"
+    [[ "$(jq '.repo' <<<"$out")" == 1 ]] || fail "$out"
+}
+
+test_updates_publish() {
+    module base
+    module dev
+    real_module bus
+    local status=0
+    dotctl updates --publish >/dev/null 2>&1 || status=$?
+    [[ "$status" == 3 ]] || fail "without dotctld: exit $status, want 3"
+    start_daemon
+    printf 'linux 1 -> 2\n' >"$SANDBOX/repo-updates"
+    dotctl updates --publish >/dev/null
+    [[ "$(dotctl bus get --data updates | jq '.packages')" == 1 ]] || fail "$(dotctl bus get updates)"
+}
+
+test_bus_module_builds_and_enables_dotctld() {
+    module base
+    module dev
+    real_module bus
+    cp -r "$REPO/daemon" "$ROOT/daemon"
+    export XDG_RUNTIME_DIR="$SANDBOX/run"
+    dotctl install bus
+    [[ -x "$DOTCTL_TARGET/.local/bin/dotctld" ]] || fail "dotctld not built"
+    grep -qx 'systemctl --user try-restart dotctld.service' "$SANDBOX/calls.log" || fail "no restart after a new build"
+    : >"$SANDBOX/calls.log"
+    local out
+    out="$(dotctl install bus 2>&1)"
+    [[ "$out" == *"dotctld is up to date"* ]] || fail "rebuild not detected as unchanged:" "$out"
+    ! grep -q try-restart "$SANDBOX/calls.log" || fail "restarted an unchanged dotctld"
+    : >"$SANDBOX/calls.log"
+    dotctl apply bus
+    links_to "$DOTCTL_TARGET/.config/systemd/user/dotctld.service" bus .config/systemd/user/dotctld.service
+    [[ "$(cat "$SANDBOX/calls.log")" == $'systemctl --user daemon-reload\nsystemctl --user enable --now dotctld.service dotctl-updates.timer' ]] \
+        || fail "calls: $(cat "$SANDBOX/calls.log")"
 }
 
 command -v go >/dev/null || { echo "tests need go to build dotctld" >&2; exit 1; }

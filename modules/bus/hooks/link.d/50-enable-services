@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Pick up the linked units and start the bus and the updates timer.
+set -euo pipefail
+if [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
+    echo "no user session; enable later: systemctl --user enable --now dotctld.service dotctl-updates.timer" >&2
+    exit 0
+fi
+if [[ ! -x "$DOTCTL_TARGET/.local/bin/dotctld" ]]; then
+    echo "dotctld is not built; run 'dotctl install bus' first" >&2
+    exit 1
+fi
+systemctl --user daemon-reload
+systemctl --user enable --now dotctld.service dotctl-updates.timer

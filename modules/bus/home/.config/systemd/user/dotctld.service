@@ -1,0 +1,11 @@
+[Unit]
+Description=dotctl bus: last value of every topic, streamed to the desktop tools
+
+[Service]
+Type=exec
+ExecStart=%h/.local/bin/dotctld
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

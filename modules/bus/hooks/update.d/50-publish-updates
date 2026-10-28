@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# After an update the counts changed; refresh the updates topic now instead of
+# waiting for the timer. dotctld not running (exit 3) is not a failure here.
+set -euo pipefail
+status=0
+"$DOTCTL_ROOT/bin/dotctl" updates --publish >/dev/null || status=$?
+((status == 0 || status == 3))

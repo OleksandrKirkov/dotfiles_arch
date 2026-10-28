@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Build dotctld from daemon/ into ~/.local/bin; restart the service only when
+# the binary changed (builds are reproducible with -trimpath).
+set -euo pipefail
+out="$DOTCTL_TARGET/.local/bin/dotctld"
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+go -C "$DOTCTL_ROOT/daemon" build -trimpath -o "$tmp" ./cmd/dotctld
+if cmp -s "$tmp" "$out"; then
+    echo "dotctld is up to date"
+    exit 0
+fi
+mkdir -p "$(dirname "$out")"
+install -m 0755 "$tmp" "$out"
+echo "installed $out"
+systemctl --user try-restart dotctld.service 2>/dev/null || true
