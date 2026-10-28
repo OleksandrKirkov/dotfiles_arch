@@ -30,7 +30,11 @@ dotctl doctor [--drift]        # links, packages, services, migrations; --drift 
 dotctl backup list             # files dotctl moved out of the way or copied
 dotctl backup add <path>       # copy a file into a backup (migrations call this before a change)
 dotctl backup restore <id>     # put them back
+dotctl bus watch theme         # dotctld topics (see docs/bus.md)
+dotctl updates                 # pending repo, pacman and AUR updates (module bus)
 ```
+
+A module can add commands: `modules/<name>/libexec/dotctl-<command>` becomes `dotctl <command>`.
 
 With no module names, commands use `hosts/<hostname>.conf` (`MODULES=(...)`), or every module when this
 machine has no host file.
@@ -58,7 +62,14 @@ Your own hooks go in `~/.config/dotctl/hooks/<event>.d/`.
 
 `themes/` holds theme packages read by `theme-switch` (module `theme`).
 
-Tests: `tests/dotctl.sh` (runs in a temporary directory, never touches `~`).
+## Bus
+
+`dotctld` (source in `daemon/`, module `bus`) keeps the last value of every topic and streams changes to the
+desktop tools, so they react to events instead of polling. Topics, API and the rules for adding one:
+[docs/bus.md](docs/bus.md).
+
+Tests: `tests/dotctl.sh` (runs in a temporary directory, never touches `~`; builds dotctld, so it needs Go) and
+`go -C daemon test -race ./...`.
 
 ## Secrets
 
