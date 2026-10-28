@@ -1,0 +1,56 @@
+# shellcheck disable=SC2164 # makepkg runs these functions with errexit: a failed cd aborts
+# dotctl: the tool only (bin/, lib/, libexec/, dotctld). The config (modules/,
+# hosts/, themes/) stays a git checkout each user clones; point the packaged
+# dotctl at it with REPO=<path> in ~/.config/dotctl/user.conf.
+#
+# Build from GitHub:          makepkg -si
+# Build from a local checkout: DOTCTL_GIT=file:///path/to/dotfiles_arch makepkg -si
+#   (builds the committed HEAD of that checkout's current branch)
+
+pkgname=dotctl
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Module-based dotfiles manager with a desktop event bus (dotctld)'
+arch=('x86_64')
+url='https://github.com/OleksandrKirkov/dotfiles_arch'
+license=('unknown')
+depends=('bash' 'coreutils' 'curl' 'git' 'jq' 'stow')
+makedepends=('go')
+optdepends=('pacman-contrib: package counts for the updates topic (checkupdates)'
+            'yay: AUR packages in modules and AUR update counts')
+source=("dotctl::git+${DOTCTL_GIT:-https://github.com/OleksandrKirkov/dotfiles_arch.git}")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd dotctl
+    local version
+    version="$(sed -n 's/^DOTCTL_VERSION="\(.*\)"$/\1/p' lib/dotctl/common.sh)"
+    printf '%s.r%s.g%s' "$version" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+    cd dotctl/daemon
+    export CGO_CPPFLAGS="${CPPFLAGS}"
+    export CGO_CFLAGS="${CFLAGS}"
+    export CGO_CXXFLAGS="${CXXFLAGS}"
+    export CGO_LDFLAGS="${LDFLAGS}"
+    export GOFLAGS="-buildmode=pie -trimpath -ldflags=-linkmode=external -mod=readonly -modcacherw"
+    go build -o dotctld ./cmd/dotctld
+}
+
+check() {
+    cd dotctl
+    go -C daemon test ./...
+    tests/dotctl.sh
+}
+
+package() {
+    cd dotctl
+    install -d "$pkgdir/usr/lib/dotctl"
+    cp -r --no-preserve=ownership bin lib libexec "$pkgdir/usr/lib/dotctl/"
+    install -d "$pkgdir/usr/bin"
+    # dotctl resolves its root through this link: /usr/lib/dotctl
+    ln -s ../lib/dotctl/bin/dotctl "$pkgdir/usr/bin/dotctl"
+    install -Dm755 daemon/dotctld "$pkgdir/usr/bin/dotctld"
+    install -Dm644 README.md docs/bus.md -t "$pkgdir/usr/share/doc/dotctl/"
+}

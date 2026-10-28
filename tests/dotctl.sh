@@ -1211,6 +1211,24 @@ test_hyprlock_wallpaper_migration() {
         || fail "$(cat "$state/hyprlock-wallpaper.conf")"
 }
 
+test_bus_hook_links_packaged_dotctld() {
+    module base
+    module dev
+    real_module bus
+    tool_only   # no daemon/ next to the tool, as in the package
+    printf '#!/bin/sh\n' >"$SANDBOX/dotctld-packaged"
+    chmod +x "$SANDBOX/dotctld-packaged"
+    DOTCTL_REPO="$ROOT" DOTCTL_PACKAGED_DOTCTLD="$SANDBOX/dotctld-packaged" packaged_dotctl install bus
+    [[ "$(readlink "$DOTCTL_TARGET/.local/bin/dotctld")" == "$SANDBOX/dotctld-packaged" ]] || fail "not linked"
+    grep -qx 'systemctl --user try-restart dotctld.service' "$SANDBOX/calls.log" || fail "no restart after linking"
+    : >"$SANDBOX/calls.log"
+    DOTCTL_REPO="$ROOT" DOTCTL_PACKAGED_DOTCTLD="$SANDBOX/dotctld-packaged" packaged_dotctl install bus
+    ! grep -q try-restart "$SANDBOX/calls.log" || fail "restarted although the link was already right"
+    local out
+    if out="$(DOTCTL_REPO="$ROOT" DOTCTL_PACKAGED_DOTCTLD=/nowhere packaged_dotctl install bus 2>&1)"; then fail "passed without a packaged dotctld"; fi
+    [[ "$out" == *"install the dotctl package"* ]] || fail "$out"
+}
+
 command -v go >/dev/null || { echo "tests need go to build dotctld" >&2; exit 1; }
 go -C "$REPO/daemon" build -o "$SANDBOX/dotctld" ./cmd/dotctld
 

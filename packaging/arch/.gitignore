@@ -1,0 +1,6 @@
+# makepkg output
+/dotctl/
+/src/
+/pkg/
+*.pkg.tar.*
+*.log

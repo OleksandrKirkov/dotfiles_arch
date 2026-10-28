@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
-# Build dotctld from daemon/ into ~/.local/bin; restart the service only when
-# the binary changed (builds are reproducible with -trimpath).
+# Put dotctld at ~/.local/bin/dotctld, where the user units run it:
+#   - a checkout (daemon/ next to the tool): build it; restart the service only
+#     when the binary changed (builds are reproducible with -trimpath);
+#   - the dotctl package (no daemon/ source): link the packaged /usr/bin/dotctld.
 set -euo pipefail
 out="$DOTCTL_TARGET/.local/bin/dotctld"
+if [[ ! -d "$DOTCTL_ROOT/daemon" ]]; then
+    packaged="${DOTCTL_PACKAGED_DOTCTLD:-/usr/bin/dotctld}"
+    [[ -x "$packaged" ]] || { echo "no daemon/ source and no $packaged; install the dotctl package" >&2; exit 1; }
+    if [[ "$(readlink -- "$out" 2>/dev/null)" != "$packaged" ]]; then
+        mkdir -p "$(dirname "$out")"
+        ln -sfn "$packaged" "$out"
+        echo "linked $out -> $packaged"
+        systemctl --user try-restart dotctld.service 2>/dev/null || true
+    fi
+    exit 0
+fi
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 go -C "$DOTCTL_ROOT/daemon" build -trimpath -o "$tmp" ./cmd/dotctld
