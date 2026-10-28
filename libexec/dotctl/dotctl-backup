@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# dotctl-summary: list, inspect and restore files dotctl moved aside
+set -euo pipefail
+# shellcheck source=../../lib/dotctl/common.sh
+source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
+
+usage() {
+    cat <<USAGE
+Usage: dotctl backup list
+       dotctl backup show <id>
+       dotctl backup restore [--dry-run] <id>
+
+Backups live in ${DOTCTL_STATE/#"$HOME"/\~}/backups/<id>/.
+Restoring removes the dotctl links in the way and moves the files back;
+the next 'dotctl apply' of that module backs them up again.
+USAGE
+}
+
+sub="${1:-list}"
+(($#)) && shift
+case "$sub" in
+    list)
+        (($# == 0)) || die "usage: dotctl backup list"
+        printf '%-36s %s\n' ID FILES
+        while IFS= read -r id; do
+            [[ -n "$id" ]] || continue
+            printf '%-36s %s\n' "$id" "$(wc -l <"$(backup_root)/$id/MANIFEST")"
+        done < <(backup_ids)
+        ;;
+    show)
+        (($# == 1)) || die "usage: dotctl backup show <id>"
+        backup_require "$1"
+        printf '%-12s %s\n' MODULE PATH
+        while IFS=$'\t' read -r module rel; do
+            printf '%-12s ~/%s\n' "$module" "$rel"
+        done <"$(backup_root)/$1/MANIFEST"
+        ;;
+    restore)
+        if [[ "${1:-}" == -n || "${1:-}" == --dry-run ]]; then
+            DOTCTL_DRY_RUN=1
+            export DOTCTL_DRY_RUN
+            shift
+        fi
+        (($# == 1)) || die "usage: dotctl backup restore [--dry-run] <id>"
+        backup_restore "$1"
+        ;;
+    -h | --help | help) usage ;;
+    *) die "unknown subcommand: $sub (see 'dotctl backup --help')" ;;
+esac

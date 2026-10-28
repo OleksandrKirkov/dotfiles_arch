@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# dotctl: entry point of the dotfiles system.
+#
+# Dispatches `dotctl <command>` git-style to the first executable named
+# dotctl-<command> in libexec/dotctl/ or modules/*/libexec/.
+
+set -euo pipefail
+
+DOTCTL_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd -P)"
+export DOTCTL_ROOT
+# shellcheck source=../lib/dotctl/common.sh
+source "$DOTCTL_ROOT/lib/dotctl/common.sh"
+
+command_paths() {
+    printf '%s\n' "$DOTCTL_ROOT"/libexec/dotctl/dotctl-* "$DOTCTL_MODULES"/*/libexec/dotctl-*
+}
+
+find_command() {
+    local path
+    while IFS= read -r path; do
+        [[ -f "$path" && -x "$path" && "${path##*/}" == "dotctl-$1" ]] && { printf '%s\n' "$path"; return 0; }
+    done < <(command_paths)
+    return 1
+}
+
+usage() {
+    local path name summary
+    cat <<USAGE
+Usage: dotctl <command> [args]
+
+Commands:
+USAGE
+    while IFS= read -r path; do
+        [[ -f "$path" && -x "$path" ]] || continue
+        name="${path##*/dotctl-}"
+        summary="$(sed -n 's/^# dotctl-summary: //p' "$path" | head -n1)"
+        printf '  %-10s %s\n' "$name" "$summary"
+    done < <(command_paths)
+    cat <<USAGE
+
+Run 'dotctl <command> --help' for a command's options.
+USAGE
+}
+
+cmd="${1:-help}"
+(($#)) && shift
+case "$cmd" in
+    help | -h | --help) usage; exit 0 ;;
+    version | --version) printf 'dotctl %s\n' "$DOTCTL_VERSION"; exit 0 ;;
+esac
+[[ "$cmd" =~ ^[a-z][a-z0-9-]*$ ]] || die "invalid command: $cmd"
+exe="$(find_command "$cmd")" || die "unknown command: $cmd (see 'dotctl help')"
+exec "$exe" "$@"

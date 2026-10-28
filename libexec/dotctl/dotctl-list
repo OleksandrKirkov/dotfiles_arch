@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# dotctl-summary: list modules, their scope and when they were last applied
+set -euo pipefail
+# shellcheck source=../../lib/dotctl/common.sh
+source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
+
+case "${1:-}" in
+    -h | --help) printf 'Usage: dotctl list\n'; exit 0 ;;
+    "") ;;
+    *) die "unknown argument: $1" ;;
+esac
+
+printf '%-12s %-7s %-26s %s\n' MODULE SCOPE APPLIED DESCRIPTION
+while IFS= read -r module; do
+    [[ -n "$module" ]] || continue
+    applied="$(state_applied_at "$module")"
+    printf '%-12s %-7s %-26s %s\n' "$module" \
+        "$(manifest_field "$module" SCOPE)" "${applied:--}" "$(manifest_field "$module" DESCRIPTION)"
+done < <(module_all)

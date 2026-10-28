@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# dotctl-summary: link modules into $HOME and run their link hooks
+set -euo pipefail
+# shellcheck source=../../lib/dotctl/common.sh
+source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
+
+usage() {
+    cat <<USAGE
+Usage: dotctl apply [--dry-run] [module...]
+
+Link each module's home/ into \$HOME (dependencies first), then run its
+hooks/link.d/ hooks. No module names means every module.
+
+Anything in the way is moved to a backup, never deleted ('dotctl backup list').
+
+  -n, --dry-run   print what would happen, change nothing
+USAGE
+}
+
+modules=()
+while (($#)); do
+    case "$1" in
+        -n | --dry-run) DOTCTL_DRY_RUN=1; export DOTCTL_DRY_RUN ;;
+        -h | --help) usage; exit 0 ;;
+        -*) die "unknown option: $1" ;;
+        *) modules+=("$1") ;;
+    esac
+    shift
+done
+
+command -v stow >/dev/null || die "GNU Stow is not installed"
+
+if ((${#modules[@]} == 0)); then
+    mapfile -t modules < <(module_all)
+    ((${#modules[@]})) || die "no modules in $DOTCTL_MODULES"
+fi
+
+resolved="$(module_resolve "${modules[@]}")"
+mapfile -t ordered <<<"$resolved"
+for module in "${ordered[@]}"; do
+    manifest_check "$module"
+done
+
+dry_run && log "dry run: nothing will change"
+log "applying: ${ordered[*]}"
+
+failed=0
+for module in "${ordered[@]}"; do
+    link_module "$module"
+    if hooks_run link "$module"; then
+        state_mark_applied "$module"
+    else
+        failed=1
+    fi
+done
+
+if [[ -n "${DOTCTL_RUN_ID:-}" && -d "$(backup_root)/$DOTCTL_RUN_ID" ]]; then
+    log "displaced files are in backup $DOTCTL_RUN_ID ('dotctl backup show $DOTCTL_RUN_ID')"
+fi
+((failed == 0)) || die "some hooks failed; modules with failed hooks are not marked applied"

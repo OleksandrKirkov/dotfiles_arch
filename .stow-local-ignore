@@ -9,3 +9,8 @@
 ^/themes
 ^/docs
 ^/\.config/systemd
+^/bin
+^/lib
+^/libexec
+^/modules
+^/tests
