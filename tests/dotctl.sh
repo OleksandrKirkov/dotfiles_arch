@@ -20,12 +20,13 @@ export DOTCTL_STATE="$SANDBOX/state"
 export DOTCTL_HOOKS="$SANDBOX/user-hooks"
 export NO_COLOR=1
 export DOTCTL_HOST=sandbox
+unset XDG_STATE_HOME
 
 passed=0
 failed=0
 
 reset_sandbox() {
-    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker}
+    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker,installed,required-by,nm}
     mkdir -p "$ROOT/modules" "$DOTCTL_TARGET"
     cp -r "$REPO/bin" "$REPO/lib" "$REPO/libexec" "$ROOT/"
     make_stubs
@@ -77,6 +78,9 @@ case "\$1" in
         for p in "\$@"; do grep -qxF -- "\$p" "$SANDBOX/missing" 2>/dev/null && { echo "\$p"; rc=127; }; done
         exit "\$rc" ;;
     -Qqe) cat "$SANDBOX/explicit" 2>/dev/null; exit 0 ;;
+    -Q) grep -qxF -- "\$2" "$SANDBOX/installed" 2>/dev/null && { echo "\$2 1.0"; exit 0; }; exit 1 ;;
+    -Qi) echo "Name            : \$2"
+         echo "Required By     : \$(cat "$SANDBOX/required-by" 2>/dev/null || echo None)"; exit 0 ;;
 esac
 echo "pacman \$*" >>"$SANDBOX/calls.log"
 STUB
@@ -111,6 +115,12 @@ migration() {
     mkdir -p "$ROOT/modules/$1/migrations"
     printf '#!/usr/bin/env bash\nset -euo pipefail\n%s\n' "$body" >"$ROOT/modules/$1/migrations/$2"
     chmod +x "$ROOT/modules/$1/migrations/$2"
+}
+
+# real_migration <module> <name>: copy a migration from this repo into the sandbox.
+real_migration() {
+    mkdir -p "$ROOT/modules/$1/migrations"
+    cp "$REPO/modules/$1/migrations/$2" "$ROOT/modules/$1/migrations/$2"
 }
 
 dotctl() { PATH="$SANDBOX/stubs:$PATH" "$ROOT/bin/dotctl" "$@"; }
@@ -632,6 +642,70 @@ test_update_stops_on_failed_migration() {
     hook zsh update 50-log
     if dotctl update --no-pull --no-packages; then fail "update succeeded"; fi
     [[ ! -e "$SANDBOX/hooks.log" ]] || fail "update hooks ran after a failed migration"
+}
+
+test_theme_migration_links_dunst_theme() {
+    module theme
+    real_migration theme 0001-link-dunst-theme
+    mkdir -p "$DOTCTL_TARGET/.local/state/theme/current"
+    printf 'x\n' >"$DOTCTL_TARGET/.local/state/theme/current/dunst.conf"
+    dotctl migrate
+    [[ "$(readlink "$DOTCTL_TARGET/.config/dunst/dunstrc.d/90-theme.conf")" == "$DOTCTL_TARGET/.local/state/theme/current/dunst.conf" ]] \
+        || fail "link not created"
+}
+
+test_theme_migration_leaves_existing_link_and_no_theme() {
+    module theme
+    real_migration theme 0001-link-dunst-theme
+    dotctl migrate
+    [[ ! -e "$DOTCTL_TARGET/.config/dunst" ]] || fail "created dunst config without a theme"
+    rm "$DOTCTL_STATE/migrations"
+    mkdir -p "$DOTCTL_TARGET/.local/state/theme/current" "$DOTCTL_TARGET/.config/dunst/dunstrc.d"
+    printf 'x\n' >"$DOTCTL_TARGET/.local/state/theme/current/dunst.conf"
+    ln -s /elsewhere "$DOTCTL_TARGET/.config/dunst/dunstrc.d/90-theme.conf"
+    dotctl migrate
+    [[ "$(readlink "$DOTCTL_TARGET/.config/dunst/dunstrc.d/90-theme.conf")" == /elsewhere ]] || fail "existing link replaced"
+}
+
+test_iwd_migration_noop_without_iwd() {
+    module network
+    real_migration network 0001-drop-iwd
+    dotctl migrate
+    [[ ! -e "$SANDBOX/calls.log" ]] || fail "called: $(cat "$SANDBOX/calls.log")"
+}
+
+test_iwd_migration_removes_unused_iwd() {
+    module network
+    real_migration network 0001-drop-iwd
+    printf 'iwd\n' >"$SANDBOX/installed"
+    mkdir -p "$SANDBOX/nm/conf.d"
+    DOTCTL_NM_CONF="$SANDBOX/nm" dotctl migrate
+    [[ "$(cat "$SANDBOX/calls.log")" == $'systemctl disable --now iwd.service\npacman -Rns --noconfirm iwd' ]] \
+        || fail "calls: $(cat "$SANDBOX/calls.log")"
+}
+
+test_iwd_migration_refuses_when_nm_uses_iwd() {
+    module network
+    real_migration network 0001-drop-iwd
+    printf 'iwd\n' >"$SANDBOX/installed"
+    mkdir -p "$SANDBOX/nm/conf.d"
+    printf '[device]\nwifi.backend=iwd\n' >"$SANDBOX/nm/conf.d/wifi_backend.conf"
+    local out
+    if out="$(DOTCTL_NM_CONF="$SANDBOX/nm" dotctl migrate 2>&1)"; then fail "migrate succeeded"; fi
+    [[ "$out" == *"NetworkManager still uses iwd"* ]] || fail "$out"
+    [[ ! -e "$SANDBOX/calls.log" ]] || fail "changed the system: $(cat "$SANDBOX/calls.log")"
+}
+
+test_iwd_migration_refuses_when_required() {
+    module network
+    real_migration network 0001-drop-iwd
+    printf 'iwd\n' >"$SANDBOX/installed"
+    printf 'some-package\n' >"$SANDBOX/required-by"
+    mkdir -p "$SANDBOX/nm"
+    local out
+    if out="$(DOTCTL_NM_CONF="$SANDBOX/nm" dotctl migrate 2>&1)"; then fail "migrate succeeded"; fi
+    [[ "$out" == *"still required by: some-package"* ]] || fail "$out"
+    [[ ! -e "$SANDBOX/calls.log" ]] || fail "changed the system"
 }
 
 for t in $(declare -F | awk '$3 ~ /^test_/ { print $3 }'); do

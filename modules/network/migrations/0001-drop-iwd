@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# NetworkManager drives Wi-Fi through its default wpa_supplicant backend and
+# iwd is no longer installed. Remove iwd where an older install left it, unless
+# NetworkManager is still configured to use it (that would cut Wi-Fi off) or
+# another package needs it; both stop here for a person to decide.
+set -euo pipefail
+nm_conf="${DOTCTL_NM_CONF:-/etc/NetworkManager}"
+
+pacman -Q iwd &>/dev/null || exit 0
+
+if grep -rqsE '^[[:space:]]*wifi\.backend[[:space:]]*=[[:space:]]*iwd' "$nm_conf"; then
+    echo "NetworkManager still uses iwd (wifi.backend=iwd in $nm_conf); switch it to wpa_supplicant first" >&2
+    exit 1
+fi
+required="$(pacman -Qi iwd | awk -F': ' '/^Required By/ { print $2 }')"
+if [[ "$required" != None* ]]; then
+    echo "iwd is still required by: $required" >&2
+    exit 1
+fi
+
+sudo systemctl disable --now iwd.service
+sudo pacman -Rns --noconfirm iwd

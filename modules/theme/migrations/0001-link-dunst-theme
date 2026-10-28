@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# The dunst theme drop-in used to be a symlink tracked in the repo; theme-switch
+# now creates it. A machine that picked its theme before that change has no
+# ~/.config/dunst/dunstrc.d/90-theme.conf once dunst is relinked: create it.
+set -euo pipefail
+current="${XDG_STATE_HOME:-$DOTCTL_TARGET/.local/state}/theme/current"
+link="$DOTCTL_TARGET/.config/dunst/dunstrc.d/90-theme.conf"
+# No theme picked yet: 'theme-switch --apply' creates the link when it picks one.
+[[ -e "$current/dunst.conf" ]] || exit 0
+[[ -e "$link" || -L "$link" ]] && exit 0
+mkdir -p "$(dirname "$link")"
+ln -s "$current/dunst.conf" "$link"
+echo "linked $link"
