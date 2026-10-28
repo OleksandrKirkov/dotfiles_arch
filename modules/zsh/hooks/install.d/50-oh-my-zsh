@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Oh My Zsh and the two plugins .zshrc loads. RUNZSH=no keeps the installer
+# from starting a shell mid-install; KEEP_ZSHRC=yes leaves ~/.zshrc to dotctl.
+set -euo pipefail
+if [[ ! -d "$DOTCTL_TARGET/.oh-my-zsh" ]]; then
+    RUNZSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+fi
+custom="${ZSH_CUSTOM:-$DOTCTL_TARGET/.oh-my-zsh/custom}"
+[[ -d "$custom/plugins/zsh-autosuggestions" ]] \
+    || git clone https://github.com/zsh-users/zsh-autosuggestions "$custom/plugins/zsh-autosuggestions"
+[[ -d "$custom/plugins/zsh-syntax-highlighting" ]] \
+    || git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$custom/plugins/zsh-syntax-highlighting"

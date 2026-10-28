@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Rust through rustup, plus rust-src for rust-analyzer.
+set -euo pipefail
+if ! command -v rustc >/dev/null; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+fi
+# shellcheck source=/dev/null
+[[ -f "$DOTCTL_TARGET/.cargo/env" ]] && . "$DOTCTL_TARGET/.cargo/env"
+rustup component add rust-src
