@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# wofi was retired: rofi runs every menu ('dotctl menu') and waybar shows
+# bluetooth natively. The wofi module is gone, so nothing relinks or unlinks
+# its files; remove the links it left behind, which now point at nothing.
+# Only links into this repo that dangle are removed; anything else stays.
+set -euo pipefail
+for rel in .config/wofi/config .config/wofi/style.css .local/bin/wofi-bluetooth; do
+    link="$DOTCTL_TARGET/$rel"
+    [[ -L "$link" && ! -e "$link" ]] || continue
+    case "$(realpath -m -- "$link")" in
+        "$DOTCTL_ROOT"/*) rm -- "$link" && echo "removed dangling $link" ;;
+    esac
+done
+rmdir --ignore-fail-on-non-empty -- "$DOTCTL_TARGET/.config/wofi" 2>/dev/null || true

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# cpu_watts.sh and memory_usage.sh were dropped: waybar's own cpu, memory and
+# temperature modules show the same. Their links predate the per-module link
+# record that lets 'dotctl apply' prune dropped files, so remove them here.
+# Only links into this repo that dangle are removed; anything else stays.
+set -euo pipefail
+for rel in .local/bin/cpu_watts.sh .local/bin/memory_usage.sh; do
+    link="$DOTCTL_TARGET/$rel"
+    [[ -L "$link" && ! -e "$link" ]] || continue
+    case "$(realpath -m -- "$link")" in
+        "$DOTCTL_ROOT"/*) rm -- "$link" && echo "removed dangling $link" ;;
+    esac
+done

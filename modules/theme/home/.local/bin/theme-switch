@@ -102,11 +102,8 @@ backfill_theme() {
 }
 
 pick_theme() {
-    if command -v rofi >/dev/null; then
-        rofi -dmenu -i -p Theme -select "$(current_theme)"
-    else
-        wofi --dmenu --prompt Theme
-    fi
+    command -v rofi >/dev/null || die "rofi is not installed"
+    rofi -dmenu -i -p Theme -select "$(current_theme)"
 }
 
 # Recolour every running nvim; if none is running, rebuild the base46 cache so the

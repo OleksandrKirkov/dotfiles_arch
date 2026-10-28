@@ -1049,6 +1049,39 @@ test_waybar_config_references_exist() {
     done < <(jq -r '.[] | objects | (.exec, ."on-click") // empty' "$cfg")
 }
 
+test_remove_wofi_links_migration() {
+    module rofi
+    real_migration rofi 0001-remove-wofi-links
+    mkdir -p "$DOTCTL_TARGET/.config/wofi" "$DOTCTL_TARGET/.local/bin" "$ROOT/still-here"
+    ln -s "$ROOT/modules/wofi/home/.config/wofi/config" "$DOTCTL_TARGET/.config/wofi/config"          # dangling, ours
+    ln -s "$ROOT/modules/wofi/home/.config/wofi/style.css" "$DOTCTL_TARGET/.config/wofi/style.css"    # dangling, ours
+    printf 'x\n' >"$ROOT/still-here/bt"
+    ln -s "$ROOT/still-here/bt" "$DOTCTL_TARGET/.local/bin/wofi-bluetooth"                           # ours, still resolves
+    dotctl migrate
+    [[ ! -e "$DOTCTL_TARGET/.config/wofi" ]] || fail ".config/wofi left: $(ls -A "$DOTCTL_TARGET/.config/wofi")"
+    [[ -L "$DOTCTL_TARGET/.local/bin/wofi-bluetooth" ]] || fail "removed a link that still resolves"
+
+    # a file of the user's own keeps the directory
+    rm "$DOTCTL_STATE/migrations"
+    mkdir -p "$DOTCTL_TARGET/.config/wofi"
+    ln -s "$ROOT/modules/wofi/home/.config/wofi/config" "$DOTCTL_TARGET/.config/wofi/config"
+    printf 'mine\n' >"$DOTCTL_TARGET/.config/wofi/style.css"
+    dotctl migrate
+    [[ ! -L "$DOTCTL_TARGET/.config/wofi/config" ]] || fail "dangling link left"
+    [[ "$(cat "$DOTCTL_TARGET/.config/wofi/style.css")" == mine ]] || fail "user file touched"
+}
+
+test_remove_bar_scripts_migration() {
+    module waybar
+    real_migration waybar 0001-remove-bar-scripts
+    mkdir -p "$DOTCTL_TARGET/.local/bin"
+    ln -s "$ROOT/modules/waybar/home/.local/bin/cpu_watts.sh" "$DOTCTL_TARGET/.local/bin/cpu_watts.sh"   # dangling, ours
+    printf 'mine\n' >"$DOTCTL_TARGET/.local/bin/memory_usage.sh"                                         # the user's own file
+    dotctl migrate
+    [[ ! -L "$DOTCTL_TARGET/.local/bin/cpu_watts.sh" ]] || fail "dangling link left"
+    [[ "$(cat "$DOTCTL_TARGET/.local/bin/memory_usage.sh")" == mine ]] || fail "user file touched"
+}
+
 command -v go >/dev/null || { echo "tests need go to build dotctld" >&2; exit 1; }
 go -C "$REPO/daemon" build -o "$SANDBOX/dotctld" ./cmd/dotctld
 
