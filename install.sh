@@ -239,7 +239,6 @@ DIR=(
     "$CONFIG_DIR/waybar"
     "$CONFIG_DIR/wofi"
     "$HOME/.gitconfig"
-    "$HOME/.zshrc"
     "$HOME/.npmrc"
 )
 
@@ -255,6 +254,11 @@ done
 echo "Setting up dotfiles with Stow..."
 cd ~/dotfiles_arch
 stow .
+
+# Ported modules (modules/<name>/home) are linked by dotctl, which backs up
+# anything in the way instead of deleting it.
+echo "Linking dotctl modules..."
+"$HOME/dotfiles_arch/bin/dotctl" apply
 
 echo "Linking theme-switch and selecting the default theme..."
 mkdir -p "$HOME/.local/bin"
