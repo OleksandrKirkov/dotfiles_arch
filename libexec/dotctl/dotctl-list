@@ -10,10 +10,10 @@ case "${1:-}" in
     *) die "unknown argument: $1" ;;
 esac
 
-printf '%-12s %-7s %-26s %s\n' MODULE SCOPE APPLIED DESCRIPTION
+printf '%-14s %-7s %-26s %s\n' MODULE SCOPE APPLIED DESCRIPTION
 while IFS= read -r module; do
     [[ -n "$module" ]] || continue
     applied="$(state_applied_at "$module")"
-    printf '%-12s %-7s %-26s %s\n' "$module" \
+    printf '%-14s %-7s %-26s %s\n' "$module" \
         "$(manifest_field "$module" SCOPE)" "${applied:--}" "$(manifest_field "$module" DESCRIPTION)"
 done < <(module_all)
