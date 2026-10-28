@@ -32,4 +32,4 @@ while IFS= read -r data; do
     done < <(jq -r '.active[]? | [.id, .urgency, .icon, .summary, .body] | @tsv' <<<"$data")
     shown=()
     for id in "${!now[@]}"; do shown[$id]=1; done
-done < <(bus_watch 1 alerts)
+done < <(bus_watch alerts | jq --unbuffered -c '.data')

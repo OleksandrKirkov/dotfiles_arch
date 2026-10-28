@@ -40,7 +40,7 @@ window#waybar {
    width (36px bar - 1px border - 2x4px margin); "align": 0.5 centres the text. */
 #custom-cpu_icon label,
 #custom-memory_icon label,
-#custom-bluetooth label {
+#custom-updates label {
   min-width: 27px;
 }
 
@@ -131,7 +131,8 @@ window#waybar {
 #backlight,
 #pulseaudio,
 #language,
-#custom-bluetooth,
+#bluetooth,
+#custom-updates,
 #network,
 #battery,
 #power-profiles-daemon {
@@ -141,14 +142,16 @@ window#waybar {
 }
 
 #pulseaudio,
-#custom-bluetooth,
+#bluetooth,
+#custom-updates,
 #network,
 #power-profiles-daemon {
   transition: background-color 150ms ease, color 150ms ease;
 }
 
 #pulseaudio:hover,
-#custom-bluetooth:hover,
+#bluetooth:hover,
+#custom-updates:hover,
 #network:hover,
 #power-profiles-daemon:hover {
   background-color: @accent;
@@ -156,6 +159,9 @@ window#waybar {
 }
 
 #pulseaudio.muted,
+#bluetooth.off,
+#bluetooth.disabled,
+#custom-updates.pending,
 #network.disconnected {
   color: @accent;
 }

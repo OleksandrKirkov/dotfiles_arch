@@ -51,11 +51,10 @@ bus_call() {
     return 1
 }
 
-# bus_watch <data-only 0|1> <topic...>: stream messages until the daemon or
-# the reader goes away.
+# bus_watch <topic...>: stream messages, one JSON object per line, until the
+# daemon or the reader goes away. Callers filter with jq --unbuffered.
 bus_watch() {
-    local data_only="$1" sock query="" topic
-    shift
+    local sock query="" topic
     sock="$(bus_socket)"
     if [[ ! -S "$sock" ]]; then
         warn "dotctld is not running (no socket at $sock)"
@@ -64,9 +63,5 @@ bus_watch() {
     for topic in "$@"; do
         query+="${query:+&}topic=$topic"
     done
-    if ((data_only)); then
-        curl -sSN --fail-with-body --unix-socket "$sock" "http://dotctl/v1/watch?$query" | jq --unbuffered -c '.data'
-    else
-        curl -sSN --fail-with-body --unix-socket "$sock" "http://dotctl/v1/watch?$query"
-    fi
+    curl -sSN --fail-with-body --unix-socket "$sock" "http://dotctl/v1/watch?$query"
 }

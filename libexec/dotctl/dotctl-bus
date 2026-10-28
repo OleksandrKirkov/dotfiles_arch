@@ -10,10 +10,12 @@ Usage: dotctl bus ping
        dotctl bus topics
        dotctl bus get [--data] <topic>
        dotctl bus publish <topic> <json | ->
-       dotctl bus watch [--data] <topic>...
+       dotctl bus watch [--data | --format <file.jq>] <topic>...
 
 Talks to dotctld over \$DOTCTL_BUS (default \$XDG_RUNTIME_DIR/dotctl/bus.sock).
-A message is {"topic","data","seq","time"}; --data prints only its data.
+A message is {"topic","data","seq","time"}; --data prints only its data,
+--format runs each message through a jq program file (waybar adapters do,
+see modules/waybar/home/.config/waybar/bus/).
 'watch' prints the current value of each topic, then every new one, one JSON
 object per line, until dotctld stops. 'publish -' reads the data from stdin.
 
@@ -52,11 +54,18 @@ case "$sub" in
         bus_call PUT "/v1/topics/$1" "$data" >/dev/null
         ;;
     watch)
-        data_only=0
-        if [[ "${1:-}" == --data ]]; then data_only=1; shift; fi
-        (($#)) || die "usage: dotctl bus watch [--data] <topic>..."
+        filter=(.)
+        case "${1:-}" in
+            --data) filter=(.data); shift ;;
+            --format)
+                [[ -f "${2:-}" ]] || die "--format needs a jq program file, got '${2:-}'"
+                filter=(-f "$2")
+                shift 2
+                ;;
+        esac
+        (($#)) || die "usage: dotctl bus watch [--data | --format <file.jq>] <topic>..."
         for topic in "$@"; do bus_check_topic "$topic"; done
-        bus_watch "$data_only" "$@"
+        bus_watch "$@" | jq --unbuffered -c "${filter[@]}"
         ;;
     -h | --help | help | "") usage ;;
     *) die "unknown subcommand: $sub (see 'dotctl bus --help')" ;;

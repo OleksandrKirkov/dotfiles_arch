@@ -12,10 +12,11 @@
   ],
   "modules-right": [
     "tray",
+    "custom/updates",
     "backlight",
     "pulseaudio",
     "hyprland/language",
-    "custom/bluetooth",
+    "bluetooth",
     "network",
     "battery",
     "power-profiles-daemon",
@@ -114,11 +115,22 @@
     "format-en": "EN",
     "format-uk": "UA"
   },
-  "custom/bluetooth": {
+  "bluetooth": {
+    "format": "",
+    "format-connected": "",
+    "format-off": "󰂲",
+    "format-disabled": "󰂲",
+    "tooltip-format": "{controller_alias}: {status}",
+    "tooltip-format-connected": "{controller_alias}: {num_connections} connected\n{device_enumerate}",
+    "tooltip-format-enumerate-connected": "{device_alias}",
+    "on-click": "~/.local/bin/dotctl menu bluetooth"
+  },
+  "custom/updates": {
+    "exec": "~/.local/bin/dotctl bus watch --format ~/.config/waybar/bus/updates.jq updates",
+    "return-type": "json",
+    "restart-interval": 10,
     "align": 0.5,
-    "exec": "~/.local/bin/wofi-bluetooth --status",
-    "interval": 5,
-    "on-click": "~/.local/bin/wofi-bluetooth"
+    "on-click": "~/.local/bin/dotctl menu updates"
   },
   "network": {
     "format-wifi": "",

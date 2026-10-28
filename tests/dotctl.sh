@@ -982,6 +982,47 @@ test_bluetooth_menu_powers_on() {
     grep -qx 'bluetoothctl power on' "$SANDBOX/calls.log" || fail "calls: $(cat "$SANDBOX/calls.log")"
 }
 
+test_waybar_updates_format() {
+    local jqf="$REPO/modules/waybar/home/.config/waybar/bus/updates.jq"
+    start_daemon
+    dotctl bus publish updates '{"repo":1,"packages":2,"aur":null,"checked":"t"}'
+    dotctl bus watch --format "$jqf" updates >"$SANDBOX/watch.out" &
+    local watcher=$!
+    wait_for_lines "$SANDBOX/watch.out" 1
+    dotctl bus publish updates '{"repo":0,"packages":0,"aur":0,"checked":"t2"}'
+    wait_for_lines "$SANDBOX/watch.out" 2
+    stop_daemon
+    wait "$watcher" 2>/dev/null || true
+    [[ "$(sed -n 1p "$SANDBOX/watch.out" | jq -c '{text, class}')" == '{"text":"󰚰\n3","class":"pending"}' ]] \
+        || fail "pending: $(sed -n 1p "$SANDBOX/watch.out")"
+    [[ "$(sed -n 1p "$SANDBOX/watch.out" | jq -r .tooltip)" == *"AUR: ?"* ]] || fail "unknown count not shown as ?"
+    [[ "$(sed -n 2p "$SANDBOX/watch.out" | jq -c '{text, class}')" == '{"text":"","class":"none"}' ]] \
+        || fail "none: $(sed -n 2p "$SANDBOX/watch.out")"
+}
+
+test_bus_watch_exit_code_without_daemon() {
+    local status=0
+    dotctl bus watch --data updates 2>/dev/null || status=$?
+    [[ "$status" == 3 ]] || fail "exit $status, want 3"
+}
+
+test_waybar_config_references_exist() {
+    local cfg="$REPO/modules/waybar/home/.config/waybar/config"
+    jq empty "$cfg" || fail "waybar config is not valid JSON"
+    local cmd
+    while IFS= read -r cmd; do
+        # shellcheck disable=SC2088 # the config holds a literal ~ that waybar's shell expands
+        case "$cmd" in
+            "~/.local/bin/dotctl menu "*) [[ -x "$REPO/modules/rofi/menus/${cmd##* }" ]] || fail "no menu for: $cmd" ;;
+            "~/.local/bin/dotctl bus watch --format "*)
+                local f="${cmd#*--format \~/}"
+                f="${f%% *}"
+                [[ -f "$REPO/modules/waybar/home/$f" ]] || fail "no jq file for: $cmd" ;;
+            *dotctl*) fail "unchecked dotctl command: $cmd" ;;
+        esac
+    done < <(jq -r '.[] | objects | (.exec, ."on-click") // empty' "$cfg")
+}
+
 command -v go >/dev/null || { echo "tests need go to build dotctld" >&2; exit 1; }
 go -C "$REPO/daemon" build -o "$SANDBOX/dotctld" ./cmd/dotctld
 
