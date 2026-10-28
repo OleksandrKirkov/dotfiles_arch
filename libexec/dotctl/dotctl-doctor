@@ -13,6 +13,7 @@ Checks the selected modules (default: hosts/<hostname>.conf, else all):
   packages   declared pacman/AUR packages and flatpak apps are installed
   services   SERVICES are enabled, SERVICES_DISABLE are not
   applied    the module was applied at least once
+  migrations every migration has run ('dotctl migrate')
 
 Explicitly installed packages no module declares are counted; --drift lists
 them. They are reported, never a failure.
@@ -98,6 +99,12 @@ section "applied"
 for module in "${ordered[@]}"; do
     [[ -n "$(state_applied_at "$module")" ]] || problem "$module was never applied"
 done
+
+section "migrations"
+pending="$(migration_pending "${ordered[@]}")"
+while IFS= read -r id; do
+    if [[ -n "$id" ]]; then problem "pending migration: $id (run 'dotctl migrate')"; fi
+done <<<"$pending"
 
 section "drift"
 if ((${#declared[@]})); then

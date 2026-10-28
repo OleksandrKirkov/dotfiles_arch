@@ -25,7 +25,7 @@ passed=0
 failed=0
 
 reset_sandbox() {
-    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks}
+    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log}
     mkdir -p "$ROOT/modules" "$DOTCTL_TARGET"
     cp -r "$REPO/bin" "$REPO/lib" "$REPO/libexec" "$ROOT/"
     make_stubs
@@ -104,6 +104,15 @@ STUB
     chmod +x "$stubs"/*
 }
 
+# migration <module> <name> [body]: executable migration; by default it
+# appends "<module>/<name>" to $SANDBOX/migrations.log
+migration() {
+    local body="${3:-echo \"\$DOTCTL_MIGRATION\" >>\"$SANDBOX/migrations.log\"}"
+    mkdir -p "$ROOT/modules/$1/migrations"
+    printf '#!/usr/bin/env bash\nset -euo pipefail\n%s\n' "$body" >"$ROOT/modules/$1/migrations/$2"
+    chmod +x "$ROOT/modules/$1/migrations/$2"
+}
+
 dotctl() { PATH="$SANDBOX/stubs:$PATH" "$ROOT/bin/dotctl" "$@"; }
 
 # fail <message>: record a failed assertion; the test keeps running so every
@@ -161,7 +170,7 @@ test_backs_up_existing_file() {
     local id
     id="$(ls "$DOTCTL_STATE/backups")"
     [[ "$(cat "$DOTCTL_STATE/backups/$id/files/.zshrc")" == old ]] || fail "backup content lost"
-    [[ "$(cat "$DOTCTL_STATE/backups/$id/MANIFEST")" == $'zsh\t.zshrc' ]] || fail "bad MANIFEST"
+    [[ "$(cat "$DOTCTL_STATE/backups/$id/MANIFEST")" == $'zsh\t.zshrc\tmove' ]] || fail "bad MANIFEST"
 }
 
 test_one_backup_per_run() {
@@ -301,6 +310,36 @@ test_backup_restore_round_trip() {
     [[ -d "$DOTCTL_STATE/backups/$id.restored" ]] || fail "backup not marked restored"
 }
 
+test_backup_restore_reads_two_column_manifest() {
+    local dir="$DOTCTL_STATE/backups/20200101T000000"
+    mkdir -p "$dir/files"
+    printf 'old\n' >"$dir/files/.zshrc"
+    printf 'zsh\t.zshrc\n' >"$dir/MANIFEST"
+    module zsh
+    dotctl backup restore 20200101T000000
+    [[ "$(cat "$DOTCTL_TARGET/.zshrc")" == old ]] || fail "not restored"
+}
+
+test_backup_add_copies_and_restore_keeps_changed_file() {
+    module zsh
+    printf 'v1\n' >"$DOTCTL_TARGET/notes"
+    local id
+    id="$(DOTCTL_MODULE=zsh dotctl backup add "$DOTCTL_TARGET/notes" "$DOTCTL_TARGET/notes")"
+    [[ "$(cat "$DOTCTL_TARGET/notes")" == v1 ]] || fail "original not left in place"
+    [[ "$(cat "$DOTCTL_STATE/backups/$id/MANIFEST")" == $'zsh\tnotes\tcopy' ]] || fail "MANIFEST: $(cat "$DOTCTL_STATE/backups/$id/MANIFEST")"
+    printf 'v2\n' >"$DOTCTL_TARGET/notes"
+    dotctl backup restore "$id"
+    [[ "$(cat "$DOTCTL_TARGET/notes")" == v1 ]] || fail "copy not restored"
+    # the changed version went to a new backup instead of being overwritten
+    grep -rqx v2 "$DOTCTL_STATE/backups" --include=notes || fail "changed version lost"
+}
+
+test_backup_add_rejects_paths_outside_target() {
+    module zsh
+    printf 'x\n' >"$SANDBOX/outside"
+    if dotctl backup add "$SANDBOX/outside"; then fail "accepted a path outside the target"; fi
+}
+
 test_backup_restore_refuses_foreign_file() {
     module zsh
     file zsh .zshrc "new"
@@ -426,6 +465,75 @@ test_doctor_drift_without_declared_packages() {
     local out
     out="$(dotctl doctor)" || fail "doctor failed:" "$out"
     [[ "$out" == *"2 explicitly installed package(s)"* ]] || fail "$out"
+}
+
+test_migrations_run_once_in_order() {
+    module zsh
+    module tmux zsh
+    migration tmux 0001-first
+    migration zsh 0002-second
+    migration zsh 0001-first
+    dotctl migrate
+    [[ "$(cat "$SANDBOX/migrations.log")" == $'zsh/0001-first\nzsh/0002-second\ntmux/0001-first' ]] \
+        || fail "order: $(tr '\n' ' ' <"$SANDBOX/migrations.log")"
+    dotctl migrate
+    [[ "$(wc -l <"$SANDBOX/migrations.log")" == 3 ]] || fail "a migration ran twice"
+    local out
+    out="$(dotctl migrate --status)"
+    [[ "$out" != *pending* ]] || fail "$out"
+}
+
+test_failed_migration_stops_and_is_not_recorded() {
+    module zsh
+    migration zsh 0001-ok
+    migration zsh 0002-broken 'exit 4'
+    migration zsh 0003-later
+    if dotctl migrate; then fail "migrate succeeded"; fi
+    [[ "$(cat "$SANDBOX/migrations.log")" == zsh/0001-ok ]] || fail "ran: $(cat "$SANDBOX/migrations.log")"
+    local out
+    out="$(dotctl migrate --status)"
+    [[ "$out" == *"zsh/0002-broken"*pending* && "$out" == *"zsh/0003-later"*pending* ]] || fail "$out"
+}
+
+test_migrate_dry_run_changes_nothing() {
+    module zsh
+    migration zsh 0001-first
+    dotctl migrate --dry-run
+    [[ ! -e "$SANDBOX/migrations.log" ]] || fail "migration ran"
+    [[ ! -e "$DOTCTL_STATE/migrations" ]] || fail "ledger written"
+}
+
+test_migration_name_is_checked() {
+    module zsh
+    migration zsh first
+    local out
+    if out="$(dotctl migrate 2>&1)"; then fail "accepted a bad name"; fi
+    [[ "$out" == *"migrations are named NNNN-slug"* ]] || fail "$out"
+}
+
+test_migration_backups_share_the_run() {
+    module zsh
+    printf 'a\n' >"$DOTCTL_TARGET/a"
+    printf 'b\n' >"$DOTCTL_TARGET/b"
+    migration zsh 0001-a 'dotctl backup add "$DOTCTL_TARGET/a" >/dev/null; echo changed >"$DOTCTL_TARGET/a"'
+    migration zsh 0002-b 'dotctl backup add "$DOTCTL_TARGET/b" >/dev/null; echo changed >"$DOTCTL_TARGET/b"'
+    dotctl migrate
+    [[ "$(backup_count)" == 1 ]] || fail "$(backup_count) backups"
+    local id
+    id="$(ls "$DOTCTL_STATE/backups")"
+    [[ "$(cat "$DOTCTL_STATE/backups/$id/MANIFEST")" == $'zsh\ta\tcopy\nzsh\tb\tcopy' ]] \
+        || fail "MANIFEST: $(cat "$DOTCTL_STATE/backups/$id/MANIFEST")"
+}
+
+test_doctor_reports_pending_migration() {
+    module zsh
+    migration zsh 0001-first
+    dotctl apply
+    local out
+    if out="$(dotctl doctor)"; then fail "doctor passed"; fi
+    [[ "$out" == *"pending migration: zsh/0001-first"* ]] || fail "$out"
+    dotctl migrate
+    out="$(dotctl doctor)" || fail "doctor failed after migrate:" "$out"
 }
 
 for t in $(declare -F | awk '$3 ~ /^test_/ { print $3 }'); do

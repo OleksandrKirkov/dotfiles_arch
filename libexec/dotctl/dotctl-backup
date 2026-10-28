@@ -8,9 +8,12 @@ usage() {
     cat <<USAGE
 Usage: dotctl backup list
        dotctl backup show <id>
+       dotctl backup add <path>...
        dotctl backup restore [--dry-run] <id>
 
 Backups live in ${DOTCTL_STATE/#"$HOME"/\~}/backups/<id>/.
+'add' copies files into a backup and leaves them in place; migrations call it
+before changing a file (all copies of one dotctl run share one backup).
 Restoring removes the dotctl links in the way and moves the files back;
 the next 'dotctl apply' of that module backs them up again.
 USAGE
@@ -30,10 +33,17 @@ case "$sub" in
     show)
         (($# == 1)) || die "usage: dotctl backup show <id>"
         backup_require "$1"
-        printf '%-12s %s\n' MODULE PATH
-        while IFS=$'\t' read -r module rel; do
-            printf '%-12s ~/%s\n' "$module" "$rel"
+        printf '%-14s %-5s %s\n' MODULE KIND PATH
+        while IFS=$'\t' read -r module rel kind; do
+            printf '%-14s %-5s ~/%s\n' "$module" "${kind:-move}" "$rel"
         done <"$(backup_root)/$1/MANIFEST"
+        ;;
+    add)
+        (($#)) || die "usage: dotctl backup add <path>..."
+        for path in "$@"; do
+            backup_copy "$path" "${DOTCTL_MODULE:-manual}"
+        done
+        dry_run || printf '%s\n' "$(dotctl_run_id)"
         ;;
     restore)
         if [[ "${1:-}" == -n || "${1:-}" == --dry-run ]]; then

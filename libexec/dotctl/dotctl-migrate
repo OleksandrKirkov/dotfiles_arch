@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# dotctl-summary: run pending one-time migrations, or show their status
+set -euo pipefail
+# shellcheck source=../../lib/dotctl/common.sh
+source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
+
+usage() {
+    cat <<USAGE
+Usage: dotctl migrate [--dry-run] [module...]
+       dotctl migrate --status [module...]
+
+Run the modules' migrations/NNNN-slug scripts that have not run on this
+machine yet, in dependency then name order, and record each in
+${DOTCTL_STATE/#"$HOME"/\~}/migrations. The first failure stops the run.
+
+No module names means the modules in hosts/<hostname>.conf, or every module
+when that file does not exist.
+
+  -n, --dry-run   list what would run, change nothing
+  --status        list every migration with when it ran, or "pending"
+USAGE
+}
+
+status=0
+modules=()
+while (($#)); do
+    case "$1" in
+        -n | --dry-run) DOTCTL_DRY_RUN=1; export DOTCTL_DRY_RUN ;;
+        --status) status=1 ;;
+        -h | --help) usage; exit 0 ;;
+        -*) die "unknown option: $1" ;;
+        *) modules+=("$1") ;;
+    esac
+    shift
+done
+
+resolved="$(module_selected "${modules[@]}")"
+mapfile -t ordered <<<"$resolved"
+for module in "${ordered[@]}"; do
+    manifest_check "$module"
+done
+
+if ((status)); then
+    list="$(migration_list "${ordered[@]}")"
+    printf '%-40s %s\n' MIGRATION RAN
+    while IFS= read -r id; do
+        [[ -n "$id" ]] || continue
+        ran="$(migration_done_at "$id")"
+        printf '%-40s %s\n' "$id" "${ran:-pending}"
+    done <<<"$list"
+    exit 0
+fi
+
+dry_run && log "dry run: nothing will change"
+migrate_run "${ordered[@]}"

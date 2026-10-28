@@ -13,6 +13,10 @@
     exit 1
 }
 
+# errexit inside $(...) too: otherwise a failure in a nested command
+# substitution is ignored and the caller carries on with partial output.
+shopt -s inherit_errexit
+
 DOTCTL_VERSION="0.1.0"
 DOTCTL_LIB="$DOTCTL_ROOT/lib/dotctl"
 DOTCTL_MODULES="$DOTCTL_ROOT/modules"
@@ -55,3 +59,5 @@ source "$DOTCTL_LIB/hooks.sh"
 source "$DOTCTL_LIB/state.sh"
 # shellcheck source=pkg.sh
 source "$DOTCTL_LIB/pkg.sh"
+# shellcheck source=migrate.sh
+source "$DOTCTL_LIB/migrate.sh"
