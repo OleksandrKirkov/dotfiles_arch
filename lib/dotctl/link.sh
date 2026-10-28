@@ -6,6 +6,10 @@
 # way is cleared:
 #   - a link into this repo (left by the old repo-root `stow .`) is removed;
 #   - any other file, directory or link is moved to a backup, never deleted.
+#
+# Each apply records the files a module linked in $DOTCTL_STATE/links/<module>.
+# A file the module no longer ships leaves a link that points at nothing; the
+# next apply removes it (only dangling links into this repo, nothing else).
 
 # path_is_repo_link <path>: true when <path> is a symlink pointing anywhere
 # inside DOTCTL_ROOT, whether or not its target still exists.
@@ -69,11 +73,39 @@ _link_clear_target() {
     fi
 }
 
+_link_state_file() { printf '%s/links/%s\n' "$DOTCTL_STATE" "$1"; }
+
+# _link_prune <module> <rels linked now, one per line>: remove the dangling
+# repo links of files the module linked last time but no longer ships.
+_link_prune() {
+    local module="$1" current="$2" file rel target
+    file="$(_link_state_file "$module")"
+    [[ -f "$file" ]] || return 0
+    while IFS= read -r rel; do
+        [[ -n "$rel" ]] || continue
+        grep -qxF -- "$rel" <<<"$current" && continue
+        target="$DOTCTL_TARGET/$rel"
+        if path_is_repo_link "$target" && [[ ! -e "$target" ]]; then
+            _link_remove_stale "$target"
+        fi
+    done <"$file"
+}
+
+_link_record() {
+    local file
+    dry_run && return 0
+    file="$(_link_state_file "$1")"
+    mkdir -p "$(dirname "$file")"
+    printf '%s' "$2" >"$file"
+}
+
 # link_module <module>
 link_module() {
-    local module="$1" pkg src rel count=0
+    local module="$1" pkg src rel count=0 current=""
     pkg="$(module_dir "$module")/home"
     if [[ ! -d "$pkg" ]]; then
+        _link_prune "$module" ""
+        _link_record "$module" ""
         log "$module: no home/ to link"
         return 0
     fi
@@ -82,8 +114,10 @@ link_module() {
         rel="${src#"$pkg"/}"
         _link_clear_parents "$module" "$rel"
         _link_clear_target "$module" "$rel"
+        current+="$rel"$'\n'
         count=$((count + 1))
     done < <(find "$pkg" -mindepth 1 \( -type f -o -type l \) -print0 | sort -z)
+    _link_prune "$module" "$current"
 
     if dry_run; then
         log "$module: would link $count file(s)"
@@ -92,5 +126,6 @@ link_module() {
     mkdir -p "$DOTCTL_TARGET"
     stow --no-folding --dir="$(module_dir "$module")" --target="$DOTCTL_TARGET" --restow home \
         || die "$module: stow failed"
+    _link_record "$module" "$current"
     log "$module: linked $count file(s)"
 }

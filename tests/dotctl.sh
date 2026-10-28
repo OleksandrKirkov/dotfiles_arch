@@ -255,6 +255,32 @@ test_backs_up_existing_file() {
     [[ "$(cat "$DOTCTL_STATE/backups/$id/MANIFEST")" == $'zsh\t.zshrc\tmove' ]] || fail "bad MANIFEST"
 }
 
+test_apply_removes_links_of_dropped_files() {
+    module waybar
+    file waybar .config/waybar/config "c"
+    file waybar .local/bin/old.sh "old"
+    file waybar .local/bin/kept.sh "kept"
+    dotctl apply
+    rm -r "$ROOT/modules/waybar/home/.local"   # the module stops shipping its scripts
+    printf 'mine\n' >"$SANDBOX/mine"
+    ln -sfn "$SANDBOX/mine" "$DOTCTL_TARGET/.local/bin/kept.sh"   # the user repointed this one
+    dotctl apply --dry-run
+    [[ -L "$DOTCTL_TARGET/.local/bin/old.sh" ]] || fail "dry run removed a link"
+    dotctl apply
+    [[ ! -L "$DOTCTL_TARGET/.local/bin/old.sh" ]] || fail "dangling link of a dropped file left"
+    [[ "$(readlink "$DOTCTL_TARGET/.local/bin/kept.sh")" == "$SANDBOX/mine" ]] || fail "user's link touched"
+    links_to "$DOTCTL_TARGET/.config/waybar/config" waybar .config/waybar/config
+}
+
+test_apply_prunes_a_module_that_dropped_home() {
+    module tablet
+    file tablet .config/otd/settings.json "s"
+    dotctl apply
+    rm -r "$ROOT/modules/tablet/home"
+    dotctl apply
+    [[ ! -L "$DOTCTL_TARGET/.config/otd/settings.json" ]] || fail "dangling link left"
+}
+
 test_one_backup_per_run() {
     module zsh
     file zsh .zshrc "new"
