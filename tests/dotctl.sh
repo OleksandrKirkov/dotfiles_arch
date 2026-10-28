@@ -164,6 +164,16 @@ test_backs_up_existing_file() {
     [[ "$(cat "$DOTCTL_STATE/backups/$id/MANIFEST")" == $'zsh\t.zshrc' ]] || fail "bad MANIFEST"
 }
 
+test_one_backup_per_run() {
+    module zsh
+    file zsh .zshrc "new"
+    file zsh .zprofile "new"
+    printf 'old\n' >"$DOTCTL_TARGET/.zshrc"
+    printf 'old\n' >"$DOTCTL_TARGET/.zprofile"
+    dotctl apply
+    [[ "$(backup_count)" == 1 ]] || fail "$(backup_count) backups for one run"
+}
+
 test_backs_up_foreign_symlink() {
     module zsh
     file zsh .zshrc "new"

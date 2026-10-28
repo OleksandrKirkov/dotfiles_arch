@@ -50,7 +50,7 @@ for module in "${ordered[@]}"; do
     fi
 done
 
-if [[ -n "${DOTCTL_RUN_ID:-}" && -d "$(backup_root)/$DOTCTL_RUN_ID" ]]; then
+if [[ -d "$(backup_root)/$DOTCTL_RUN_ID" ]]; then
     log "displaced files are in backup $DOTCTL_RUN_ID ('dotctl backup show $DOTCTL_RUN_ID')"
 fi
 ((failed == 0)) || die "some hooks failed; modules with failed hooks are not marked applied"

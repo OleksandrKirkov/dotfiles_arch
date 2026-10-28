@@ -34,15 +34,14 @@ die()  { printf '%serror:%s %s\n' "$_c_red" "$_c_reset" "$*" >&2; exit 1; }
 
 dry_run() { [[ "$DOTCTL_DRY_RUN" == 1 ]]; }
 
-# One id per dotctl invocation, shared by every backup taken during it.
+# One id per dotctl invocation, shared by every backup taken during it and
+# inherited by the commands and hooks it starts. Set here, at load time: set
+# inside a $(...) it would be lost and every backup would get its own id.
 # Nanoseconds keep two runs in the same second apart.
-dotctl_run_id() {
-    if [[ -z "${DOTCTL_RUN_ID:-}" ]]; then
-        DOTCTL_RUN_ID="$(date +%Y%m%dT%H%M%S%N)"
-        export DOTCTL_RUN_ID
-    fi
-    printf '%s\n' "$DOTCTL_RUN_ID"
-}
+DOTCTL_RUN_ID="${DOTCTL_RUN_ID:-$(date +%Y%m%dT%H%M%S%N)}"
+export DOTCTL_RUN_ID
+
+dotctl_run_id() { printf '%s\n' "$DOTCTL_RUN_ID"; }
 
 # shellcheck source=manifest.sh
 source "$DOTCTL_LIB/manifest.sh"
