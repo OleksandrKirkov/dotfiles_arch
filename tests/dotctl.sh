@@ -1083,6 +1083,69 @@ test_remove_bar_scripts_migration() {
     [[ "$(cat "$DOTCTL_TARGET/.local/bin/memory_usage.sh")" == mine ]] || fail "user file touched"
 }
 
+# rendered_path <module> <rel>: where a module's rendered template lives
+rendered_path() { printf '%s/render/%s/home/%s\n' "$DOTCTL_STATE" "$1" "$2"; }
+
+test_template_renders_user_values() {
+    module base
+    file base .gitconfig.tmpl $'[user]\n    name = @GIT_NAME@\n    home = @HOME@ (@USER@)'
+    chmod 600 "$ROOT/modules/base/home/.gitconfig.tmpl"
+    printf 'GIT_NAME="Jane Doe"\n' >"$DOTCTL_USER_CONF"
+    dotctl apply
+    local target="$DOTCTL_TARGET/.gitconfig"
+    [[ "$(readlink -f "$target")" == "$(rendered_path base .gitconfig)" ]] || fail "links to $(readlink -f "$target")"
+    [[ "$(cat "$target")" == $'[user]\n    name = Jane Doe\n    home = '"$DOTCTL_TARGET ($USER)" ]] || fail "content: $(cat "$target")"
+    [[ "$(stat -c %a "$(rendered_path base .gitconfig)")" == 600 ]] || fail "mode not kept"
+    [[ ! -e "$DOTCTL_TARGET/.gitconfig.tmpl" ]] || fail "the template itself was linked"
+    dotctl apply
+    [[ "$(backup_count)" == 0 ]] || fail "re-apply backed up its own render"
+    local out
+    out="$(dotctl doctor)" || fail "doctor:" "$out"
+}
+
+test_template_missing_key_stops_apply_and_dry_run() {
+    module base
+    file base .gitconfig.tmpl 'name = @GIT_NAME@'
+    local out
+    if out="$(dotctl apply --dry-run 2>&1)"; then fail "dry run passed"; fi
+    [[ "$out" == *"uses @GIT_NAME@, which is not set; add GIT_NAME=... to $DOTCTL_USER_CONF"* ]] || fail "$out"
+    if dotctl apply 2>/dev/null; then fail "apply passed"; fi
+    [[ ! -e "$DOTCTL_TARGET/.gitconfig" ]] || fail "linked anyway"
+}
+
+test_template_replaces_old_plain_link_and_prunes_when_dropped() {
+    module waybar
+    file waybar .config/waybar/style.css 'plain'
+    dotctl apply
+    rm "$ROOT/modules/waybar/home/.config/waybar/style.css"
+    printf '@import "@HOME@/x.css";\n' >"$ROOT/modules/waybar/home/.config/waybar/style.css.tmpl"
+    dotctl apply
+    [[ "$(cat "$DOTCTL_TARGET/.config/waybar/style.css")" == "@import \"$DOTCTL_TARGET/x.css\";" ]] || fail "not rendered"
+    [[ "$(backup_count)" == 0 ]] || fail "old link was backed up instead of replaced"
+    rm "$ROOT/modules/waybar/home/.config/waybar/style.css.tmpl"
+    file waybar .config/waybar/config 'c'
+    dotctl apply
+    [[ ! -L "$DOTCTL_TARGET/.config/waybar/style.css" ]] || fail "link of a dropped template left"
+}
+
+test_template_and_plain_file_clash() {
+    module base
+    file base .gitconfig 'a'
+    file base .gitconfig.tmpl 'b'
+    local out
+    if out="$(dotctl apply 2>&1)"; then fail "apply passed"; fi
+    [[ "$out" == *"both .gitconfig and .gitconfig.tmpl exist"* ]] || fail "$out"
+}
+
+test_user_conf_rejects_multiline_values() {
+    module base
+    printf 'X="a\nb"\n' >"$DOTCTL_USER_CONF"
+    file base .x.tmpl '@X@'
+    local out
+    if out="$(dotctl apply 2>&1)"; then fail "multi-line value accepted"; fi
+    [[ "$out" == *"values must be one line"* ]] || fail "$out"
+}
+
 # tool_only: a copy of the tool without modules/, as the package installs it
 tool_only() {
     mkdir -p "$SANDBOX/tool"

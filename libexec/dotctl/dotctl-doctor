@@ -54,6 +54,10 @@ for module in "${ordered[@]}"; do
     [[ -d "$pkg" ]] || continue
     while IFS= read -r -d '' src; do
         rel="${src#"$pkg"/}"
+        if [[ "$rel" == *.tmpl ]]; then
+            rel="${rel%.tmpl}"
+            src="$(render_root)/$module/home/$rel"
+        fi
         target="$DOTCTL_TARGET/$rel"
         if [[ ! -L "$target" ]]; then
             problem "$module: ~/$rel is not linked"

@@ -7,19 +7,53 @@
 #   - a link into this repo (left by the old repo-root `stow .`) is removed;
 #   - any other file, directory or link is moved to a backup, never deleted.
 #
+# Templates: a file named <name>.tmpl is not linked itself. Its @KEY@ markers
+# are replaced with the user's values (HOME, USER and the keys of user.conf,
+# see user.sh), the result is written to $DOTCTL_STATE/render/<module>/home/<name>,
+# and that is linked at ~/<name>. An unset key stops the apply. The render
+# directory is regenerated on every apply.
+#
 # Each apply records the files a module linked in $DOTCTL_STATE/links/<module>.
 # A file the module no longer ships leaves a link that points at nothing; the
 # next apply removes it (only dangling links into this repo, nothing else).
 
-# path_is_repo_link <path>: true when <path> is a symlink pointing anywhere
-# inside DOTCTL_REPO, whether or not its target still exists.
+render_root() { printf '%s/render\n' "$DOTCTL_STATE"; }
+
+# path_is_repo_link <path>: true when <path> is a symlink dotctl owns: one
+# pointing anywhere inside DOTCTL_REPO or the render directory, whether or not
+# its target still exists.
 path_is_repo_link() {
-    local path="$1" dest
+    local path="$1" dest render
     [[ -L "$path" ]] || return 1
     dest="$(readlink -- "$path")"
     [[ "$dest" == /* ]] || dest="$(dirname -- "$path")/$dest"
     dest="$(realpath -m -- "$dest")"
-    [[ "$dest" == "$DOTCTL_REPO" || "$dest" == "$DOTCTL_REPO"/* ]]
+    render="$(realpath -m -- "$(render_root)")"
+    [[ "$dest" == "$DOTCTL_REPO" || "$dest" == "$DOTCTL_REPO"/* || "$dest" == "$render"/* ]]
+}
+
+# render_template <src> <dst> <vars assoc name>: write src with @KEY@ replaced.
+render_template() {
+    local src="$1" dst="$2" content out="" rest key match tmp
+    local -n _tvars="$3"
+    # read it all, trailing newlines included
+    content="$(cat -- "$src"; printf x)"
+    content="${content%x}"
+    rest="$content"
+    while [[ "$rest" =~ @([A-Z][A-Z0-9_]*)@ ]]; do
+        match="${BASH_REMATCH[0]}"
+        key="${BASH_REMATCH[1]}"
+        [[ -v "_tvars[$key]" ]] \
+            || die "${src#"$DOTCTL_REPO"/} uses @$key@, which is not set; add $key=... to $DOTCTL_USER_CONF"
+        out+="${rest%%"$match"*}${_tvars[$key]}"
+        rest="${rest#*"$match"}"
+    done
+    out+="$rest"
+    mkdir -p "$(dirname -- "$dst")"
+    tmp="$(mktemp "$dst.XXXXXX")"
+    printf '%s' "$out" >"$tmp"
+    chmod --reference="$src" "$tmp"
+    mv -- "$tmp" "$dst"
 }
 
 # Paths a dry run already reported: nothing is removed, so a folded directory
@@ -62,10 +96,10 @@ _link_clear_parents() {
     done
 }
 
+# _link_clear_target <module> <rel> <the file ~/<rel> should link to>
 _link_clear_target() {
-    local module="$1" rel="$2" target own
+    local module="$1" rel="$2" own="$3" target
     target="$DOTCTL_TARGET/$rel"
-    own="$(module_dir "$module")/home/$rel"
     if path_is_repo_link "$target"; then
         [[ "$(realpath -m -- "$target")" == "$(realpath -m -- "$own")" ]] || _link_remove_stale "$target"
     elif [[ -e "$target" || -L "$target" ]]; then
@@ -101,31 +135,71 @@ _link_record() {
 
 # link_module <module>
 link_module() {
-    local module="$1" pkg src rel count=0 current=""
+    local module="$1" pkg src rel own render count=0 current=""
+    local -a templates=()
     pkg="$(module_dir "$module")/home"
+    render="$(render_root)/$module"
     if [[ ! -d "$pkg" ]]; then
         _link_prune "$module" ""
         _link_record "$module" ""
+        dry_run || rm -rf -- "$render"
         log "$module: no home/ to link"
         return 0
     fi
 
     while IFS= read -r -d '' src; do
         rel="${src#"$pkg"/}"
+        own="$src"
+        if [[ "$rel" == *.tmpl ]]; then
+            rel="${rel%.tmpl}"
+            [[ ! -e "$pkg/$rel" && ! -L "$pkg/$rel" ]] || die "$module: both $rel and $rel.tmpl exist"
+            own="$render/home/$rel"
+            templates+=("$rel")
+        fi
         _link_clear_parents "$module" "$rel"
-        _link_clear_target "$module" "$rel"
+        _link_clear_target "$module" "$rel" "$own"
         current+="$rel"$'\n'
         count=$((count + 1))
     done < <(find "$pkg" -mindepth 1 \( -type f -o -type l \) -print0 | sort -z)
-    _link_prune "$module" "$current"
 
     if dry_run; then
-        log "$module: would link $count file(s)"
+        if ((${#templates[@]})); then
+            # Render into a scratch directory so a missing key fails the dry run too.
+            # shellcheck disable=SC2034 # filled and read through namerefs
+            local -A vars=()
+            local scratch
+            user_template_vars vars
+            scratch="$(mktemp -d)"
+            for rel in "${templates[@]}"; do
+                render_template "$pkg/$rel.tmpl" "$scratch/$rel" vars
+            done
+            rm -rf -- "$scratch"
+        fi
+        _link_prune "$module" "$current"
+        log "$module: would link $count file(s), ${#templates[@]} rendered"
         return 0
     fi
+
+    # Regenerate the renders; a template dropped since the last apply leaves a
+    # dangling link that the prune below removes.
+    rm -rf -- "$render"
+    if ((${#templates[@]})); then
+        # shellcheck disable=SC2034 # filled and read through namerefs
+        local -A vars=()
+        user_template_vars vars
+        for rel in "${templates[@]}"; do
+            render_template "$pkg/$rel.tmpl" "$render/home/$rel" vars
+        done
+    fi
+    _link_prune "$module" "$current"
+
     mkdir -p "$DOTCTL_TARGET"
-    stow --no-folding --dir="$(module_dir "$module")" --target="$DOTCTL_TARGET" --restow home \
+    stow --no-folding --ignore='\.tmpl' --dir="$(module_dir "$module")" --target="$DOTCTL_TARGET" --restow home \
         || die "$module: stow failed"
+    if ((${#templates[@]})); then
+        stow --no-folding --dir="$render" --target="$DOTCTL_TARGET" --restow home \
+            || die "$module: stow of rendered templates failed"
+    fi
     _link_record "$module" "$current"
-    log "$module: linked $count file(s)"
+    log "$module: linked $count file(s), ${#templates[@]} rendered"
 }
