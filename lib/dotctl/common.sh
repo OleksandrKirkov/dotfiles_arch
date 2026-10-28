@@ -61,3 +61,5 @@ source "$DOTCTL_LIB/state.sh"
 source "$DOTCTL_LIB/pkg.sh"
 # shellcheck source=migrate.sh
 source "$DOTCTL_LIB/migrate.sh"
+# shellcheck source=bus.sh
+source "$DOTCTL_LIB/bus.sh"

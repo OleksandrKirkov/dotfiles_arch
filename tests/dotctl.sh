@@ -20,13 +20,15 @@ export DOTCTL_STATE="$SANDBOX/state"
 export DOTCTL_HOOKS="$SANDBOX/user-hooks"
 export NO_COLOR=1
 export DOTCTL_HOST=sandbox
+export DOTCTL_BUS="$SANDBOX/run/bus.sock"
+export DOTCTL_BUS_STATE="$SANDBOX/bus.json"
 unset XDG_STATE_HOME
 
 passed=0
 failed=0
 
 reset_sandbox() {
-    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker,installed,required-by,nm}
+    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker,installed,required-by,nm,run,bus.json,watch.out}
     mkdir -p "$ROOT/modules" "$DOTCTL_TARGET"
     cp -r "$REPO/bin" "$REPO/lib" "$REPO/libexec" "$ROOT/"
     make_stubs
@@ -117,6 +119,33 @@ migration() {
     chmod +x "$ROOT/modules/$1/migrations/$2"
 }
 
+# start_daemon: run the dotctld built for this test run on $DOTCTL_BUS.
+start_daemon() {
+    "$SANDBOX/dotctld" >>"$SANDBOX/daemon.log" 2>&1 &
+    echo $! >"$SANDBOX/daemon.pid"
+    for _ in $(seq 50); do
+        [[ -S "$DOTCTL_BUS" ]] && return 0
+        sleep 0.1
+    done
+    fail "dotctld did not start: $(cat "$SANDBOX/daemon.log")"
+}
+
+stop_daemon() {
+    [[ -f "$SANDBOX/daemon.pid" ]] || return 0
+    kill "$(cat "$SANDBOX/daemon.pid")" 2>/dev/null || true
+    wait "$(cat "$SANDBOX/daemon.pid")" 2>/dev/null || true
+    rm -f "$SANDBOX/daemon.pid"
+}
+
+# wait_for_lines <file> <count>: wait up to 5 s for the file to hold <count> lines.
+wait_for_lines() {
+    for _ in $(seq 50); do
+        [[ -f "$1" && "$(wc -l <"$1")" -ge "$2" ]] && return 0
+        sleep 0.1
+    done
+    fail "$1 has $(wc -l <"$1" 2>/dev/null || echo 0) lines, want $2"
+}
+
 # real_migration <module> <name>: copy a migration from this repo into the sandbox.
 real_migration() {
     mkdir -p "$ROOT/modules/$1/migrations"
@@ -149,6 +178,7 @@ run() {
     rm -f "$SANDBOX/failed" "$SANDBOX/hooks.log"
     (set -e; "$name") >"$SANDBOX/out" 2>&1 &
     wait $! || status=$?
+    stop_daemon
     if ((status == 0)) && [[ ! -e "$SANDBOX/failed" ]]; then
         passed=$((passed + 1))
         printf 'ok   %s\n' "$name"
@@ -707,6 +737,60 @@ test_iwd_migration_refuses_when_required() {
     [[ "$out" == *"still required by: some-package"* ]] || fail "$out"
     [[ ! -e "$SANDBOX/calls.log" ]] || fail "changed the system"
 }
+
+test_bus_publish_get_topics() {
+    start_daemon
+    dotctl bus ping
+    dotctl bus publish theme '{"name":"tokyonight"}'
+    printf '{"packages":3}' | dotctl bus publish updates -
+    [[ "$(dotctl bus get --data theme)" == '{"name":"tokyonight"}' ]] || fail "get --data: $(dotctl bus get --data theme)"
+    [[ "$(dotctl bus get theme | jq -r '.topic + " " + (.seq | tostring)')" == "theme 1" ]] || fail "get: $(dotctl bus get theme)"
+    local out
+    out="$(dotctl bus topics)"
+    [[ "$out" == *theme*updates* ]] || fail "topics: $out"
+}
+
+test_bus_exit_codes() {
+    local status=0
+    dotctl bus get theme 2>"$SANDBOX/err" || status=$?
+    [[ "$status" == 3 && "$(cat "$SANDBOX/err")" == *"dotctld is not running"* ]] || fail "not running: $status $(cat "$SANDBOX/err")"
+    start_daemon
+    status=0
+    dotctl bus get theme 2>"$SANDBOX/err" || status=$?
+    [[ "$status" == 4 && "$(cat "$SANDBOX/err")" == *"nothing published on theme"* ]] || fail "missing: $status $(cat "$SANDBOX/err")"
+    status=0
+    dotctl bus publish theme '{bad' 2>"$SANDBOX/err" || status=$?
+    [[ "$status" == 1 && "$(cat "$SANDBOX/err")" == *"data must be valid JSON"* ]] || fail "bad json: $status $(cat "$SANDBOX/err")"
+    status=0
+    dotctl bus publish '../x' 1 2>"$SANDBOX/err" || status=$?
+    [[ "$status" == 1 && "$(cat "$SANDBOX/err")" == *"invalid topic"* ]] || fail "bad topic: $status $(cat "$SANDBOX/err")"
+}
+
+test_bus_watch_streams_current_then_new() {
+    start_daemon
+    dotctl bus publish theme '"a"'
+    dotctl bus watch --data theme updates >"$SANDBOX/watch.out" &
+    local watcher=$!
+    wait_for_lines "$SANDBOX/watch.out" 1
+    dotctl bus publish other '0'
+    dotctl bus publish updates '{"packages":1}'
+    wait_for_lines "$SANDBOX/watch.out" 2
+    [[ "$(cat "$SANDBOX/watch.out")" == $'"a"\n{"packages":1}' ]] || fail "watch: $(cat "$SANDBOX/watch.out")"
+    stop_daemon # the stream ends with the daemon
+    for _ in $(seq 50); do kill -0 "$watcher" 2>/dev/null || break; sleep 0.1; done
+    if kill -0 "$watcher" 2>/dev/null; then kill "$watcher"; fail "watch kept running after dotctld stopped"; fi
+}
+
+test_bus_state_survives_restart() {
+    start_daemon
+    dotctl bus publish theme '"a"'
+    stop_daemon
+    start_daemon
+    [[ "$(dotctl bus get --data theme)" == '"a"' ]] || fail "theme lost on restart"
+}
+
+command -v go >/dev/null || { echo "tests need go to build dotctld" >&2; exit 1; }
+go -C "$REPO/daemon" build -o "$SANDBOX/dotctld" ./cmd/dotctld
 
 for t in $(declare -F | awk '$3 ~ /^test_/ { print $3 }'); do
     run "$t"

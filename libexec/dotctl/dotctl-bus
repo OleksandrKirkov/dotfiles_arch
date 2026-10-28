@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# dotctl-summary: read, publish and watch topics on the dotctld bus
+set -euo pipefail
+# shellcheck source=../../lib/dotctl/common.sh
+source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
+
+usage() {
+    cat <<USAGE
+Usage: dotctl bus ping
+       dotctl bus topics
+       dotctl bus get [--data] <topic>
+       dotctl bus publish <topic> <json | ->
+       dotctl bus watch [--data] <topic>...
+
+Talks to dotctld over \$DOTCTL_BUS (default \$XDG_RUNTIME_DIR/dotctl/bus.sock).
+A message is {"topic","data","seq","time"}; --data prints only its data.
+'watch' prints the current value of each topic, then every new one, one JSON
+object per line, until dotctld stops. 'publish -' reads the data from stdin.
+
+Exit status: 0 ok, 1 rejected, 3 dotctld not running, 4 nothing published yet.
+Topics and their data: docs/bus.md.
+USAGE
+}
+
+sub="${1:-}"
+(($#)) && shift
+case "$sub" in
+    ping)
+        (($# == 0)) || die "usage: dotctl bus ping"
+        bus_call GET /v1/ping >/dev/null
+        log "dotctld is running on $(bus_socket)"
+        ;;
+    topics)
+        (($# == 0)) || die "usage: dotctl bus topics"
+        out="$(bus_call GET /v1/topics)" || exit $?
+        jq -r '.topics[] | [.topic, (.seq | tostring), .time] | @tsv' <<<"$out" \
+            | awk -F'\t' 'BEGIN { printf "%-24s %-6s %s\n", "TOPIC", "SEQ", "TIME" } { printf "%-24s %-6s %s\n", $1, $2, $3 }'
+        ;;
+    get)
+        data_only=0
+        if [[ "${1:-}" == --data ]]; then data_only=1; shift; fi
+        (($# == 1)) || die "usage: dotctl bus get [--data] <topic>"
+        bus_check_topic "$1"
+        out="$(bus_call GET "/v1/topics/$1")" || exit $?
+        if ((data_only)); then jq -c '.data' <<<"$out"; else printf '%s\n' "$out"; fi
+        ;;
+    publish)
+        (($# == 2)) || die "usage: dotctl bus publish <topic> <json | ->"
+        bus_check_topic "$1"
+        data="$2"
+        [[ "$data" != - ]] || data="$(cat)"
+        bus_call PUT "/v1/topics/$1" "$data" >/dev/null
+        ;;
+    watch)
+        data_only=0
+        if [[ "${1:-}" == --data ]]; then data_only=1; shift; fi
+        (($#)) || die "usage: dotctl bus watch [--data] <topic>..."
+        for topic in "$@"; do bus_check_topic "$topic"; done
+        bus_watch "$data_only" "$@"
+        ;;
+    -h | --help | help | "") usage ;;
+    *) die "unknown subcommand: $sub (see 'dotctl bus --help')" ;;
+esac
