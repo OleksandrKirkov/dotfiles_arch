@@ -6,7 +6,7 @@
 #   hypr.lua       Hyprland border colours
 #   waybar.css     @define-color palette imported by waybar/style.css
 #   rofi.rasi      colour variables imported by rofi/theme.rasi
-#   dunst.conf     dunst drop-in linked from dunst/dunstrc.d/90-theme.conf
+#   dunst.conf     dunst drop-in, linked to ~/.config/dunst/dunstrc.d/90-theme.conf
 #   ghostty        Ghostty theme file
 #   btop.theme     btop theme
 #   hyprlock.conf  hyprlock colour variables
@@ -19,7 +19,14 @@
 
 set -euo pipefail
 
-REPO="$(cd "$(dirname "$(readlink -f "$0")")/../.." && pwd)"
+SELF_DIR="$(dirname "$(readlink -f "$0")")"
+# The repo root is the nearest ancestor holding themes/ (this script lives in
+# modules/theme/home/.local/bin/).
+REPO="$SELF_DIR"
+until [[ -d "$REPO/themes" ]]; do
+    [[ "$REPO" != / ]] || { echo "theme-switch: no themes/ above $SELF_DIR" >&2; exit 1; }
+    REPO="$(dirname "$REPO")"
+done
 THEMES="$REPO/themes"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/theme"
 CURRENT="$STATE/current"
@@ -68,7 +75,7 @@ generate_theme() {
         # shellcheck source=/dev/null
         wallpaper="$(source "$CURRENT/theme.env"; echo "${wallpaper:-}")"
     fi
-    "$REPO/.local/bin/theme-gen" "$name" "$THEMES/$name" "$wallpaper"
+    "$SELF_DIR/theme-gen" "$name" "$THEMES/$name" "$wallpaper"
 }
 
 # Themes built before a new app was themed lack its file: generate the missing
@@ -86,7 +93,7 @@ backfill_theme() {
         wallpaper="$(source "$dir/theme.env"; echo "${wallpaper:-}")"
     fi
     tmp="$(mktemp -d)"
-    if "$REPO/.local/bin/theme-gen" "$name" "$tmp" "$wallpaper" >/dev/null; then
+    if "$SELF_DIR/theme-gen" "$name" "$tmp" "$wallpaper" >/dev/null; then
         for f in "$tmp"/*; do
             [[ -e "$dir/${f##*/}" ]] || cp -- "$f" "$dir/"
         done
@@ -194,6 +201,12 @@ link_btop() {
     ln -sfn "$CURRENT/btop.theme" "$HOME/.config/btop/themes/current.theme"
 }
 
+# dunst reads every file in dunstrc.d/; 90-theme.conf follows the active theme.
+link_dunst() {
+    mkdir -p "$HOME/.config/dunst/dunstrc.d"
+    ln -sfn "$CURRENT/dunst.conf" "$HOME/.config/dunst/dunstrc.d/90-theme.conf"
+}
+
 name=""
 case "${1:-}" in
     -h|--help) usage; exit 0 ;;
@@ -218,6 +231,7 @@ backfill_theme "$THEMES/$name"
 mkdir -p "$STATE"
 ln -sfn "$THEMES/$name" "$CURRENT"
 link_btop
+link_dunst
 
 wallpaper=""
 # shellcheck source=/dev/null

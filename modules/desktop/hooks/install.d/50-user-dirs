@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Directories the configs expect (user-dirs.dirs, the develop workspace).
+set -euo pipefail
+mkdir -p "$DOTCTL_TARGET/develop" "$DOTCTL_TARGET/Pictures" "$DOTCTL_TARGET/Videos"

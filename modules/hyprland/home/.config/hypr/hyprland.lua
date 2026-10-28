@@ -60,7 +60,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
     -- low battery (<10%) and high RAM (>28 GB) notifications
-    hl.exec_cmd("$HOME/dotfiles_arch/.local/bin/system-alerts")
+    hl.exec_cmd("$HOME/.local/bin/system-alerts")
 end)
 
 -- Environment (NVIDIA + toolkit defaults)
