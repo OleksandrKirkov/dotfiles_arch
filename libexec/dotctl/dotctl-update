@@ -11,7 +11,7 @@ Usage: dotctl update [--dry-run] [--no-pull] [--no-packages]
 Bring this machine up to date with the repo, for the modules in
 hosts/<hostname>.conf (or every module when that file does not exist):
 
-  1. git pull --ff-only in $DOTCTL_ROOT
+  1. git pull --ff-only in $DOTCTL_REPO
   2. continue with the dotctl that was just pulled
   3. dotctl install   packages (with a full pacman -Syu), services, install hooks
   4. dotctl apply     links and link hooks
@@ -40,7 +40,7 @@ while (($#)); do
 done
 
 dotctl_cmd() { "$DOTCTL_ROOT/bin/dotctl" "$@"; }
-git_repo() { git -C "$DOTCTL_ROOT" "$@"; }
+git_repo() { git -C "$DOTCTL_REPO" "$@"; }
 
 if ((pull)); then
     command -v git >/dev/null || die "git is not installed"
@@ -57,7 +57,7 @@ if ((pull)); then
         fi
     else
         before="$(git_repo rev-parse HEAD)"
-        git_repo pull --ff-only --quiet || die "git pull --ff-only failed; resolve it in $DOTCTL_ROOT, then rerun"
+        git_repo pull --ff-only --quiet || die "git pull --ff-only failed; resolve it in $DOTCTL_REPO, then rerun"
         after="$(git_repo rev-parse HEAD)"
         if [[ "$before" == "$after" ]]; then
             log "repo is up to date with $upstream"

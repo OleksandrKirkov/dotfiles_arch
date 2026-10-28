@@ -4,7 +4,7 @@ set -euo pipefail
 # shellcheck source=../../../lib/dotctl/common.sh
 source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
 # shellcheck source=../lib/menu.sh
-source "$DOTCTL_ROOT/modules/rofi/lib/menu.sh"
+source "$DOTCTL_REPO/modules/rofi/lib/menu.sh"
 
 # Menus are executables named modules/<module>/menus/<name>; any module can add one.
 menu_paths() {

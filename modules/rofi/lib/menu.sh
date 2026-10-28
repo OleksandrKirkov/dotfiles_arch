@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # menu.sh: the one picker every dotctl menu uses, so all menus share the rofi
 # config and the active theme. Menus source it:
-#   source "$DOTCTL_ROOT/modules/rofi/lib/menu.sh"
+#   source "$DOTCTL_REPO/modules/rofi/lib/menu.sh"
 #
 # $DOTCTL_MENU_PICKER replaces rofi (tests use it); it gets the prompt as its
 # last argument and the entries on stdin, and prints the chosen entry.

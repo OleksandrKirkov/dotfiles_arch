@@ -2,7 +2,7 @@
 # Pending updates from the bus (topic "updates"): update now, or check again.
 set -euo pipefail
 # shellcheck source=../lib/menu.sh
-source "$DOTCTL_ROOT/modules/rofi/lib/menu.sh"
+source "$DOTCTL_REPO/modules/rofi/lib/menu.sh"
 dotctl="$DOTCTL_ROOT/bin/dotctl"
 
 summary="unknown"

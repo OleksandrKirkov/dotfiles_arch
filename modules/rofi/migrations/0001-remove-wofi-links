@@ -8,7 +8,7 @@ for rel in .config/wofi/config .config/wofi/style.css .local/bin/wofi-bluetooth;
     link="$DOTCTL_TARGET/$rel"
     [[ -L "$link" && ! -e "$link" ]] || continue
     case "$(realpath -m -- "$link")" in
-        "$DOTCTL_ROOT"/*) rm -- "$link" && echo "removed dangling $link" ;;
+        "$DOTCTL_REPO"/*) rm -- "$link" && echo "removed dangling $link" ;;
     esac
 done
 rmdir --ignore-fail-on-non-empty -- "$DOTCTL_TARGET/.config/wofi" 2>/dev/null || true

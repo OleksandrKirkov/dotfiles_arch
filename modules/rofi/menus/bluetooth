@@ -10,7 +10,7 @@
 # Depends on: rofi, bluez-utils (contains bluetoothctl)
 
 # shellcheck source=../lib/menu.sh
-source "$DOTCTL_ROOT/modules/rofi/lib/menu.sh"
+source "$DOTCTL_REPO/modules/rofi/lib/menu.sh"
 
 # Constants
 divider="---------"

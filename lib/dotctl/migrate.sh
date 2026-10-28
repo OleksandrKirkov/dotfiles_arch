@@ -13,7 +13,7 @@
 # Modules run in dependency order, migrations in name order. The first failure
 # stops the run and is not recorded, so it runs again next time.
 #
-# Each migration gets DOTCTL_ROOT, DOTCTL_TARGET, DOTCTL_RUN_ID, DOTCTL_MODULE
+# Each migration gets DOTCTL_ROOT, DOTCTL_REPO, DOTCTL_TARGET, DOTCTL_RUN_ID, DOTCTL_MODULE
 # and DOTCTL_MIGRATION (<module>/<name>), and bin/ first on PATH for dotctl.
 
 migration_ledger() { printf '%s/migrations\n' "$DOTCTL_STATE"; }

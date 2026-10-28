@@ -8,6 +8,6 @@ for rel in .local/bin/cpu_watts.sh .local/bin/memory_usage.sh; do
     link="$DOTCTL_TARGET/$rel"
     [[ -L "$link" && ! -e "$link" ]] || continue
     case "$(realpath -m -- "$link")" in
-        "$DOTCTL_ROOT"/*) rm -- "$link" && echo "removed dangling $link" ;;
+        "$DOTCTL_REPO"/*) rm -- "$link" && echo "removed dangling $link" ;;
     esac
 done

@@ -127,7 +127,7 @@ module_resolve() {
 
 dotctl_host() { printf '%s\n' "${DOTCTL_HOST:-$(uname -n)}"; }
 
-host_file() { printf '%s/hosts/%s.conf\n' "$DOTCTL_ROOT" "$(dotctl_host)"; }
+host_file() { printf '%s/hosts/%s.conf\n' "$DOTCTL_REPO" "$(dotctl_host)"; }
 
 # module_selected [module...]: the named modules, else the host's MODULES,
 # else every module; dependencies included, dependencies first.

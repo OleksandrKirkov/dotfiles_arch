@@ -38,9 +38,9 @@ done
 count_lines() { if [[ -z "$1" ]]; then echo 0; else wc -l <<<"$1"; fi; }
 
 repo=null
-if git -C "$DOTCTL_ROOT" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
-    if ((fetch == 0)) || git -C "$DOTCTL_ROOT" fetch --quiet 2>/dev/null; then
-        repo="$(git -C "$DOTCTL_ROOT" rev-list --count 'HEAD..@{upstream}')"
+if git -C "$DOTCTL_REPO" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
+    if ((fetch == 0)) || git -C "$DOTCTL_REPO" fetch --quiet 2>/dev/null; then
+        repo="$(git -C "$DOTCTL_REPO" rev-list --count 'HEAD..@{upstream}')"
     fi
 fi
 

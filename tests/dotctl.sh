@@ -20,6 +20,7 @@ export DOTCTL_STATE="$SANDBOX/state"
 export DOTCTL_HOOKS="$SANDBOX/user-hooks"
 export NO_COLOR=1
 export DOTCTL_HOST=sandbox
+export DOTCTL_USER_CONF="$SANDBOX/user.conf"
 export DOTCTL_MENU_PICKER="$SANDBOX/stubs/picker" TERMINAL=terminal
 export DOTCTL_BUS="$SANDBOX/run/bus.sock"
 export DOTCTL_BUS_STATE="$SANDBOX/bus.json"
@@ -29,7 +30,7 @@ passed=0
 failed=0
 
 reset_sandbox() {
-    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker,installed,required-by,nm,run,bus.json,watch.out,aur-updates,repo-updates,picks,menu.log}
+    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker,installed,required-by,nm,run,bus.json,watch.out,aur-updates,repo-updates,picks,menu.log,user.conf,tool}
     mkdir -p "$ROOT/modules" "$DOTCTL_TARGET"
     cp -r "$REPO/bin" "$REPO/lib" "$REPO/libexec" "$ROOT/"
     make_stubs
@@ -1080,6 +1081,34 @@ test_remove_bar_scripts_migration() {
     dotctl migrate
     [[ ! -L "$DOTCTL_TARGET/.local/bin/cpu_watts.sh" ]] || fail "dangling link left"
     [[ "$(cat "$DOTCTL_TARGET/.local/bin/memory_usage.sh")" == mine ]] || fail "user file touched"
+}
+
+# tool_only: a copy of the tool without modules/, as the package installs it
+tool_only() {
+    mkdir -p "$SANDBOX/tool"
+    cp -r "$REPO/bin" "$REPO/lib" "$REPO/libexec" "$SANDBOX/tool/"
+}
+
+packaged_dotctl() { PATH="$SANDBOX/stubs:$PATH" "$SANDBOX/tool/bin/dotctl" "$@"; }
+
+test_packaged_tool_finds_repo() {
+    module zsh
+    file zsh .zshrc "z"
+    tool_only
+    local out
+    if out="$(packaged_dotctl list 2>&1)"; then fail "ran without a repo"; fi
+    [[ "$out" == *"no config repo: set REPO="* ]] || fail "$out"
+    printf 'REPO="%s"\n' "$ROOT" >"$DOTCTL_USER_CONF"
+    packaged_dotctl apply
+    links_to "$DOTCTL_TARGET/.zshrc" zsh .zshrc
+    printf 'REPO=/nowhere\n' >"$DOTCTL_USER_CONF"
+    DOTCTL_REPO="$ROOT" packaged_dotctl list >/dev/null || fail "DOTCTL_REPO did not win over user.conf"
+}
+
+test_checkout_uses_its_own_repo_over_user_conf() {
+    module zsh
+    printf 'REPO=/nowhere\n' >"$DOTCTL_USER_CONF"
+    dotctl list >/dev/null || fail "a checkout read REPO from user.conf"
 }
 
 command -v go >/dev/null || { echo "tests need go to build dotctld" >&2; exit 1; }

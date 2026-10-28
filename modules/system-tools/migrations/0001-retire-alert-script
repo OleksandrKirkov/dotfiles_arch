@@ -7,6 +7,6 @@ pkill -f -- '/system-alerts$' || true
 link="$DOTCTL_TARGET/.local/bin/system-alerts"
 if [[ -L "$link" && ! -e "$link" ]]; then
     case "$(realpath -m -- "$link")" in
-        "$DOTCTL_ROOT"/*) rm -- "$link" && echo "removed dangling $link" ;;
+        "$DOTCTL_REPO"/*) rm -- "$link" && echo "removed dangling $link" ;;
     esac
 fi

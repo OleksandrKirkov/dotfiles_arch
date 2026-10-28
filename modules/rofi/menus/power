@@ -2,7 +2,7 @@
 # Lock, suspend, log out, reboot or shut down. The last three ask first.
 set -euo pipefail
 # shellcheck source=../lib/menu.sh
-source "$DOTCTL_ROOT/modules/rofi/lib/menu.sh"
+source "$DOTCTL_REPO/modules/rofi/lib/menu.sh"
 
 choice="$(printf '%s\n' "  Lock" "  Suspend" "󰍃  Log out" "  Reboot" "  Shut down" | menu_pick power)" || exit 0
 case "$choice" in

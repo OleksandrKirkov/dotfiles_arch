@@ -12,14 +12,14 @@
 # next apply removes it (only dangling links into this repo, nothing else).
 
 # path_is_repo_link <path>: true when <path> is a symlink pointing anywhere
-# inside DOTCTL_ROOT, whether or not its target still exists.
+# inside DOTCTL_REPO, whether or not its target still exists.
 path_is_repo_link() {
     local path="$1" dest
     [[ -L "$path" ]] || return 1
     dest="$(readlink -- "$path")"
     [[ "$dest" == /* ]] || dest="$(dirname -- "$path")/$dest"
     dest="$(realpath -m -- "$dest")"
-    [[ "$dest" == "$DOTCTL_ROOT" || "$dest" == "$DOTCTL_ROOT"/* ]]
+    [[ "$dest" == "$DOTCTL_REPO" || "$dest" == "$DOTCTL_REPO"/* ]]
 }
 
 # Paths a dry run already reported: nothing is removed, so a folded directory
@@ -48,7 +48,7 @@ _link_clear_parents() {
         if path_is_repo_link "$path"; then
             # A folded directory link from the old `stow .`. Removing a live one
             # would unlink files that were not moved into this module.
-            [[ ! -e "$path" ]] || die "${path/#"$DOTCTL_TARGET"/\~} is a directory link into $DOTCTL_ROOT that still resolves; move all of its files into module '$module' first"
+            [[ ! -e "$path" ]] || die "${path/#"$DOTCTL_TARGET"/\~} is a directory link into $DOTCTL_REPO that still resolves; move all of its files into module '$module' first"
             _link_remove_stale "$path"
             return 0
         elif [[ -L "$path" ]]; then

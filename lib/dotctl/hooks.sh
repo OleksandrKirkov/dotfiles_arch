@@ -6,10 +6,11 @@
 #
 # Like run-parts: hooks run in name order, and only executable files whose
 # name is made of [A-Za-z0-9_-] run (so "50-reload" runs, "50-reload.bak" does not).
-# Each hook gets DOTCTL_ROOT, DOTCTL_TARGET, DOTCTL_EVENT and DOTCTL_MODULE
+# Each hook gets DOTCTL_ROOT, DOTCTL_REPO, DOTCTL_TARGET, DOTCTL_EVENT and DOTCTL_MODULE
 # (empty for user hooks). A failing hook is reported; the rest still run.
 #
-# Events so far: link (after a module's files are linked).
+# Events: install (dotctl install, after packages and services), link (dotctl apply,
+# after a module is linked), update (dotctl update, last).
 
 _hooks_run_dir() {
     local dir="$1" event="$2" module="$3" hook name status failed=0
@@ -22,10 +23,10 @@ _hooks_run_dir() {
             continue
         fi
         if dry_run; then
-            log "would run $event hook ${hook/#"$DOTCTL_ROOT"\//}"
+            log "would run $event hook ${hook/#"$DOTCTL_REPO"\//}"
             continue
         fi
-        log "$event hook ${hook/#"$DOTCTL_ROOT"\//}"
+        log "$event hook ${hook/#"$DOTCTL_REPO"\//}"
         status=0
         DOTCTL_EVENT="$event" DOTCTL_MODULE="$module" "$hook" || status=$?
         if ((status != 0)); then
