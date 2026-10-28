@@ -25,7 +25,7 @@ passed=0
 failed=0
 
 reset_sandbox() {
-    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log}
+    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker}
     mkdir -p "$ROOT/modules" "$DOTCTL_TARGET"
     cp -r "$REPO/bin" "$REPO/lib" "$REPO/libexec" "$ROOT/"
     make_stubs
@@ -534,6 +534,104 @@ test_doctor_reports_pending_migration() {
     [[ "$out" == *"pending migration: zsh/0001-first"* ]] || fail "$out"
     dotctl migrate
     out="$(dotctl doctor)" || fail "doctor failed after migrate:" "$out"
+}
+
+# git_fixture: make $ROOT a git repo with an origin at $SANDBOX/git/origin.git
+# and a second clone at $SANDBOX/git/work for pushing "upstream" changes.
+# Git config is sandboxed; the real ~/.gitconfig is never read.
+git_fixture() {
+    export GIT_CONFIG_GLOBAL="$SANDBOX/git/config" GIT_CONFIG_NOSYSTEM=1
+    mkdir -p "$SANDBOX/git"
+    git config --global user.name test
+    git config --global user.email test@example.invalid
+    git -C "$ROOT" init -q -b main
+    git -C "$ROOT" add -A
+    git -C "$ROOT" commit -qm init
+    git clone -q --bare "$ROOT" "$SANDBOX/git/origin.git"
+    git -C "$ROOT" remote add origin "$SANDBOX/git/origin.git"
+    git -C "$ROOT" fetch -q origin
+    git -C "$ROOT" branch -q --set-upstream-to=origin/main
+    git clone -q "$SANDBOX/git/origin.git" "$SANDBOX/git/work"
+}
+
+# push_migration <module> <name>: commit a logging migration upstream.
+push_migration() {
+    local work="$SANDBOX/git/work"
+    mkdir -p "$work/modules/$1/migrations"
+    printf '#!/usr/bin/env bash\necho "$DOTCTL_MIGRATION" >>"%s/migrations.log"\n' "$SANDBOX" >"$work/modules/$1/migrations/$2"
+    chmod +x "$work/modules/$1/migrations/$2"
+    git -C "$work" add -A
+    git -C "$work" commit -qm "add $2"
+    git -C "$work" push -q origin main
+}
+
+test_update_pulls_then_installs_applies_migrates() {
+    module zsh
+    file zsh .zshrc "z"
+    field zsh 'PACMAN=(zsh)'
+    hook zsh update 50-log
+    git_fixture
+    push_migration zsh 0001-pulled
+    dotctl update
+    [[ "$(git -C "$ROOT" rev-parse HEAD)" == "$(git -C "$SANDBOX/git/work" rev-parse HEAD)" ]] || fail "not pulled"
+    [[ "$(cat "$SANDBOX/calls.log")" == "pacman -Syu --needed --noconfirm zsh" ]] || fail "calls: $(cat "$SANDBOX/calls.log")"
+    links_to "$DOTCTL_TARGET/.zshrc" zsh .zshrc
+    [[ "$(cat "$SANDBOX/migrations.log")" == zsh/0001-pulled ]] || fail "pulled migration did not run"
+    [[ "$(cat "$SANDBOX/hooks.log")" == zsh:update ]] || fail "hooks: $(cat "$SANDBOX/hooks.log")"
+}
+
+test_update_continues_with_pulled_code() {
+    module zsh
+    git_fixture
+    local work="$SANDBOX/git/work"
+    sed -i "s|^log \"update complete\"$|echo pulled-code >>\"$SANDBOX/marker\"; log \"update complete\"|" \
+        "$work/libexec/dotctl/dotctl-update"
+    grep -q pulled-code "$work/libexec/dotctl/dotctl-update" || fail "fixture edit did not apply"
+    git -C "$work" commit -qam "change update"
+    git -C "$work" push -q origin main
+    dotctl update --no-packages
+    [[ "$(cat "$SANDBOX/marker" 2>/dev/null)" == pulled-code ]] || fail "update ran the old code"
+}
+
+test_update_no_pull_no_packages() {
+    module zsh
+    file zsh .zshrc "z"
+    field zsh 'PACMAN=(zsh)'
+    migration zsh 0001-local
+    dotctl update --no-pull --no-packages
+    [[ ! -e "$SANDBOX/calls.log" ]] || fail "packages installed: $(cat "$SANDBOX/calls.log")"
+    links_to "$DOTCTL_TARGET/.zshrc" zsh .zshrc
+    [[ "$(cat "$SANDBOX/migrations.log")" == zsh/0001-local ]] || fail "migration did not run"
+}
+
+test_update_dry_run_lists_incoming_and_changes_nothing() {
+    module zsh
+    file zsh .zshrc "z"
+    git_fixture
+    push_migration zsh 0001-pulled
+    local head out
+    head="$(git -C "$ROOT" rev-parse HEAD)"
+    out="$(dotctl update --dry-run 2>&1)" || fail "dry run failed:" "$out"
+    [[ "$out" == *"add 0001-pulled"* ]] || fail "incoming commit not listed:" "$out"
+    [[ "$(git -C "$ROOT" rev-parse HEAD)" == "$head" ]] || fail "repo moved"
+    [[ ! -L "$DOTCTL_TARGET/.zshrc" && ! -e "$SANDBOX/migrations.log" && ! -e "$SANDBOX/calls.log" ]] || fail "something changed"
+}
+
+test_update_without_upstream_fails() {
+    module zsh
+    export GIT_CONFIG_GLOBAL="$SANDBOX/git/config" GIT_CONFIG_NOSYSTEM=1
+    git -C "$ROOT" init -q -b main
+    local out
+    if out="$(dotctl update 2>&1)"; then fail "update succeeded"; fi
+    [[ "$out" == *"has no upstream"* ]] || fail "$out"
+}
+
+test_update_stops_on_failed_migration() {
+    module zsh
+    migration zsh 0001-broken 'exit 1'
+    hook zsh update 50-log
+    if dotctl update --no-pull --no-packages; then fail "update succeeded"; fi
+    [[ ! -e "$SANDBOX/hooks.log" ]] || fail "update hooks ran after a failed migration"
 }
 
 for t in $(declare -F | awk '$3 ~ /^test_/ { print $3 }'); do

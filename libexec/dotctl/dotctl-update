@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# dotctl-summary: pull the repo, then install, apply, migrate and run update hooks
+set -euo pipefail
+# shellcheck source=../../lib/dotctl/common.sh
+source "${DOTCTL_ROOT:?run through bin/dotctl}/lib/dotctl/common.sh"
+
+usage() {
+    cat <<USAGE
+Usage: dotctl update [--dry-run] [--no-pull] [--no-packages]
+
+Bring this machine up to date with the repo, for the modules in
+hosts/<hostname>.conf (or every module when that file does not exist):
+
+  1. git pull --ff-only in $DOTCTL_ROOT
+  2. continue with the dotctl that was just pulled
+  3. dotctl install   packages (with a full pacman -Syu), services, install hooks
+  4. dotctl apply     links and link hooks
+  5. dotctl migrate   one-time migrations
+  6. hooks/update.d/  module hooks, then ~/.config/dotctl/hooks/update.d/
+
+The first failing step stops the update.
+
+  -n, --dry-run    fetch and list the incoming commits, then dry-run steps 3-6
+  --no-pull        skip steps 1-2 (use the repo as it is)
+  --no-packages    skip step 3
+USAGE
+}
+
+pull=1
+packages=1
+while (($#)); do
+    case "$1" in
+        -n | --dry-run) DOTCTL_DRY_RUN=1; export DOTCTL_DRY_RUN ;;
+        --no-pull) pull=0 ;;
+        --no-packages) packages=0 ;;
+        -h | --help) usage; exit 0 ;;
+        *) die "unknown argument: $1" ;;
+    esac
+    shift
+done
+
+dotctl_cmd() { "$DOTCTL_ROOT/bin/dotctl" "$@"; }
+git_repo() { git -C "$DOTCTL_ROOT" "$@"; }
+
+if ((pull)); then
+    command -v git >/dev/null || die "git is not installed"
+    upstream="$(git_repo rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)" \
+        || die "the repo's current branch has no upstream; use --no-pull or set one with 'git branch --set-upstream-to'"
+    if dry_run; then
+        git_repo fetch --quiet
+        incoming="$(git_repo log --oneline "HEAD..$upstream")"
+        if [[ -n "$incoming" ]]; then
+            log "would pull from $upstream:"
+            printf '%s\n' "$incoming" >&2
+        else
+            log "repo is up to date with $upstream"
+        fi
+    else
+        before="$(git_repo rev-parse HEAD)"
+        git_repo pull --ff-only --quiet || die "git pull --ff-only failed; resolve it in $DOTCTL_ROOT, then rerun"
+        after="$(git_repo rev-parse HEAD)"
+        if [[ "$before" == "$after" ]]; then
+            log "repo is up to date with $upstream"
+        else
+            log "pulled ${before:0:7}..${after:0:7} from $upstream"
+        fi
+        # The rest of the update must run the code that was just pulled.
+        args=(--no-pull)
+        ((packages)) || args+=(--no-packages)
+        exec "$DOTCTL_ROOT/bin/dotctl" update "${args[@]}"
+    fi
+fi
+
+dry_run_flag=()
+dry_run && dry_run_flag=(--dry-run)
+
+if ((packages)); then dotctl_cmd install "${dry_run_flag[@]}"; fi
+dotctl_cmd apply "${dry_run_flag[@]}"
+dotctl_cmd migrate "${dry_run_flag[@]}"
+
+resolved="$(module_selected)"
+mapfile -t ordered <<<"$resolved"
+hooks_run update "${ordered[@]}" || die "some update hooks failed"
+log "update complete"
