@@ -187,12 +187,13 @@ for _, k in ipairs(order) do
 end
 write("btop.theme", table.concat(lines, "\n") .. "\n")
 
+-- No $wallpaper here: it is a path in the user's home, so theme-switch writes it
+-- per user to ~/.local/state/theme/hyprlock-wallpaper.conf.
 write("hyprlock.conf", string.format([[
-$wallpaper = %s
 $text   = rgba(%sff)
 $accent = rgba(%see)
 $check  = rgba(%see)
 $fail   = rgba(%see)
-]], wallpaper, hex(c.white), hex(accent), hex(c.green), hex(c.red)))
+]], hex(c.white), hex(accent), hex(c.green), hex(c.red)))
 
 print("theme-gen: wrote " .. out)

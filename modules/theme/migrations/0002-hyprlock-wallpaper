@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# hyprlock's $wallpaper moved out of the shared theme packages (it is a path in
+# the user's home) into ~/.local/state/theme/hyprlock-wallpaper.conf, which
+# theme-switch writes. Write it once for a theme picked before that change.
+set -euo pipefail
+state="${XDG_STATE_HOME:-$DOTCTL_TARGET/.local/state}/theme"
+file="$state/hyprlock-wallpaper.conf"
+[[ -f "$state/current/theme.env" ]] || exit 0   # no theme yet: theme-switch writes it
+[[ -e "$file" ]] && exit 0
+wallpaper="$(
+    wallpaper=""
+    HOME="$DOTCTL_TARGET"
+    # shellcheck source=/dev/null
+    source "$state/current/theme.env"
+    printf '%s' "$wallpaper"
+)"
+# shellcheck disable=SC2016 # $wallpaper is a literal hyprlang variable
+printf '# Written by theme-switch from the active theme'"'"'s theme.env.\n$wallpaper = %s\n' "$wallpaper" >"$file"
+echo "wrote $file"

@@ -25,6 +25,21 @@ EOF
 
 REPO="$(cd "$(dirname "$(readlink -f "$0")")" && pwd -P)"
 
+# Templates need this user's values; check before spending time on packages.
+USER_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/dotctl/user.conf"
+if [ ! -f "$USER_CONF" ]; then
+    cat >&2 <<USAGE
+Create $USER_CONF first, with your own values:
+
+    GIT_NAME="Your Name"
+    GIT_EMAIL="you@example.com"
+    GITHUB_USER="your-github-login"
+
+then run ./install.sh again. See README.md, "Per-user values".
+USAGE
+    exit 1
+fi
+
 echo "Installing packages, services and tools..."
 "$REPO/bin/dotctl" install
 

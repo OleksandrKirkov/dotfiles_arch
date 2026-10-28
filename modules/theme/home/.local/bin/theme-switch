@@ -68,6 +68,10 @@ all_themes() {
     } | sort -u
 }
 
+# theme.env is shared by every user: keep a wallpaper in this home as a literal
+# $HOME (it expands when theme.env is sourced) instead of this user's path.
+unexpand_home() { printf '%s\n' "${1/#"$HOME"\//\$HOME/}"; }
+
 # Build themes/<name>/ from nvim's palette, inheriting the current wallpaper.
 generate_theme() {
     local name="$1" wallpaper=""
@@ -75,7 +79,7 @@ generate_theme() {
         # shellcheck source=/dev/null
         wallpaper="$(source "$CURRENT/theme.env"; echo "${wallpaper:-}")"
     fi
-    "$SELF_DIR/theme-gen" "$name" "$THEMES/$name" "$wallpaper"
+    "$SELF_DIR/theme-gen" "$name" "$THEMES/$name" "$(unexpand_home "$wallpaper")"
 }
 
 # Themes built before a new app was themed lack its file: generate the missing
@@ -93,7 +97,7 @@ backfill_theme() {
         wallpaper="$(source "$dir/theme.env"; echo "${wallpaper:-}")"
     fi
     tmp="$(mktemp -d)"
-    if "$SELF_DIR/theme-gen" "$name" "$tmp" "$wallpaper" >/dev/null; then
+    if "$SELF_DIR/theme-gen" "$name" "$tmp" "$(unexpand_home "$wallpaper")" >/dev/null; then
         for f in "$tmp"/*; do
             [[ -e "$dir/${f##*/}" ]] || cp -- "$f" "$dir/"
         done
@@ -206,6 +210,14 @@ publish_theme() {
         2>/dev/null || true
 }
 
+# hyprlock: $wallpaper is per user (a path in $HOME), so it is not in the shared
+# theme package; write it next to the current-theme link.
+write_hyprlock_wallpaper() {
+    # shellcheck disable=SC2016 # $wallpaper is a literal hyprlang variable
+    printf '# Written by theme-switch from the active theme'"'"'s theme.env.\n$wallpaper = %s\n' "$1" \
+        >"$STATE/hyprlock-wallpaper.conf"
+}
+
 # dunst reads every file in dunstrc.d/; 90-theme.conf follows the active theme.
 link_dunst() {
     mkdir -p "$HOME/.config/dunst/dunstrc.d"
@@ -245,6 +257,7 @@ source "$CURRENT/theme.env"
 nvim_theme=""
 [[ -f "$CURRENT/nvim" ]] && nvim_theme="$(head -n1 "$CURRENT/nvim")"
 
+write_hyprlock_wallpaper "$wallpaper"
 apply_hyprland
 reload_apps
 apply_nvim "$nvim_theme"

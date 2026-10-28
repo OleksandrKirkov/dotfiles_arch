@@ -1174,6 +1174,43 @@ test_checkout_uses_its_own_repo_over_user_conf() {
     dotctl list >/dev/null || fail "a checkout read REPO from user.conf"
 }
 
+test_repo_has_no_home_paths() {
+    local hits
+    hits="$(grep -rnIE '/home/[a-z_][a-z0-9_-]*/' "$REPO/modules" "$REPO/themes" "$REPO/hosts" || true)"
+    [[ -z "$hits" ]] || fail "user-specific paths (use @HOME@ in a .tmpl, or \$HOME):" "$hits"
+}
+
+test_real_templates_render() {
+    rm -rf "$ROOT/modules"
+    cp -r "$REPO/modules" "$ROOT/modules"
+    printf 'GIT_NAME="Jane Doe"\nGIT_EMAIL="jane@example.invalid"\nGITHUB_USER=jane\n' >"$DOTCTL_USER_CONF"
+    dotctl apply --dry-run >/dev/null 2>&1 || fail "dry run of the real modules failed: $(dotctl apply --dry-run 2>&1 | tail -3)"
+    dotctl apply base
+    grep -qx '    name = Jane Doe' "$DOTCTL_TARGET/.gitconfig" || fail ".gitconfig: $(cat "$DOTCTL_TARGET/.gitconfig")"
+    local rendered
+    rendered="$(grep -rhoE '@[A-Z][A-Z0-9_]*@' "$DOTCTL_STATE/render" || true)"
+    [[ -z "$rendered" ]] || fail "markers left after rendering: $rendered"
+}
+
+test_real_templates_name_missing_keys() {
+    rm -rf "$ROOT/modules"
+    cp -r "$REPO/modules" "$ROOT/modules"
+    local out
+    if out="$(dotctl apply --dry-run base 2>&1)"; then fail "base rendered without GIT_NAME"; fi
+    [[ "$out" == *"@GIT_NAME@, which is not set"* ]] || fail "$out"
+}
+
+test_hyprlock_wallpaper_migration() {
+    module theme
+    real_migration theme 0002-hyprlock-wallpaper
+    local state="$DOTCTL_TARGET/.local/state/theme"
+    mkdir -p "$state/current"
+    printf 'wallpaper="$HOME/Pictures/a.jpg"\n' >"$state/current/theme.env"
+    dotctl migrate
+    [[ "$(cat "$state/hyprlock-wallpaper.conf")" == *$'\n$wallpaper = '"$DOTCTL_TARGET/Pictures/a.jpg" ]] \
+        || fail "$(cat "$state/hyprlock-wallpaper.conf")"
+}
+
 command -v go >/dev/null || { echo "tests need go to build dotctld" >&2; exit 1; }
 go -C "$REPO/daemon" build -o "$SANDBOX/dotctld" ./cmd/dotctld
 
