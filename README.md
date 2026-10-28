@@ -109,7 +109,10 @@ Each apply records what a module linked (`~/.local/state/dotctl/links/<module>`)
 shipping a file, the next apply removes the link that now points at nothing. Your own hooks go in
 `~/.config/dotctl/hooks/<event>.d/`.
 
-`themes/` holds theme packages read by `theme-switch` (module `theme`).
+`themes/` holds theme packages read by `theme-switch` (module `theme`). Each package's `gtk.css` is copied
+to `~/.config/gtk-4.0/gtk.css` (never over one theme-gen did not write) and recolours libadwaita apps such as
+pwvucontrol on their next start; `theme-switch` also sets `color-scheme` to `prefer-dark` and lets Flatpak apps
+read that folder.
 
 ## Bus
 
