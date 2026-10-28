@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Reload tmux.conf in a running tmux server so a relink takes effect without
+# restarting sessions (the same as prefix + r). No server running: nothing to do.
+set -euo pipefail
+command -v tmux >/dev/null || exit 0
+tmux info &>/dev/null || exit 0
+tmux source-file "$DOTCTL_TARGET/.config/tmux/tmux.conf"
