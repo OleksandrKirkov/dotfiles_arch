@@ -108,7 +108,7 @@
     },
     "tooltip-format": "Volume {volume}%",
     "scroll-step": 5,
-    "on-click": "pavucontrol"
+    "on-click": "flatpak run com.saivert.pwvucontrol"
   },
   "hyprland/language": {
     "format": "{}",
