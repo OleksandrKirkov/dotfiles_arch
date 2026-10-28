@@ -201,6 +201,14 @@ link_btop() {
     ln -sfn "$CURRENT/btop.theme" "$HOME/.config/btop/themes/current.theme"
 }
 
+# Tell the desktop tools through the dotctl bus (docs/bus.md, topic "theme").
+# Best effort: without a running dotctld the switch still completes.
+publish_theme() {
+    command -v dotctl >/dev/null || return 0
+    dotctl bus publish theme "$(jq -cn --arg name "$1" --arg wallpaper "$2" '{name: $name, wallpaper: $wallpaper}')" \
+        2>/dev/null || true
+}
+
 # dunst reads every file in dunstrc.d/; 90-theme.conf follows the active theme.
 link_dunst() {
     mkdir -p "$HOME/.config/dunst/dunstrc.d"
@@ -244,5 +252,6 @@ apply_hyprland
 reload_apps
 apply_nvim "$nvim_theme"
 apply_wallpaper "$wallpaper"
+publish_theme "$name" "$wallpaper"
 
 command -v notify-send >/dev/null && notify-send -a theme-switch -t 1500 "Theme" "$name" || true
