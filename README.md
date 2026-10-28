@@ -5,11 +5,54 @@
 ```sh
 git clone git@github.com:OleksandrKirkov/dotfiles_arch.git ~/dotfiles_arch
 cd ~/dotfiles_arch
+mkdir -p ~/.config/dotctl && $EDITOR ~/.config/dotctl/user.conf   # see "Per-user values"
 ./install.sh
 ```
 
-`install.sh` runs `dotctl install` (packages, services, install hooks), `dotctl apply` (links),
-`theme-switch --apply`, then `dotctl migrate`.
+`install.sh` checks for `user.conf`, then runs `dotctl install` (packages, services, install hooks),
+`dotctl apply` (links), `theme-switch --apply`, then `dotctl migrate`.
+
+The checkout can live anywhere; nothing assumes `~/dotfiles_arch`.
+
+## Per-user values
+
+Nothing in the repo belongs to one user. Each user who applies it keeps their own values in
+`~/.config/dotctl/user.conf` (plain `KEY="value"` lines, `$HOME` allowed, never committed):
+
+```sh
+GIT_NAME="Your Name"
+GIT_EMAIL="you@example.com"
+GITHUB_USER="your-github-login"
+REPO="$HOME/dotfiles_arch"   # only for the packaged dotctl, see "Package"
+```
+
+A module file named `<name>.tmpl` is a template: `dotctl apply` replaces `@HOME@`, `@USER@` and every
+`@KEY@` from `user.conf`, writes the result to `~/.local/state/dotctl/render/<module>/home/<name>` and links
+that at `~/<name>`. A key a template needs but `user.conf` lacks stops the apply (and the dry run) with its
+name. Use a template only where the tool cannot expand `$HOME` itself (CSS imports, hyprlang, GTK
+bookmarks); shell files, `theme.env` and `.npmrc` use `$HOME` / `${HOME}` directly. `tests/dotctl.sh` fails if
+a `/home/<user>/` path appears in `modules/`, `themes/` or `hosts/`.
+
+### Another user on the same machine
+
+Each user clones the repo into their own home, writes their own `user.conf`, and runs `./install.sh` (or
+`dotctl apply` when the packages are already installed). Home directories stay private; nothing is shared
+but the system packages.
+
+## Package
+
+`packaging/arch/PKGBUILD` packages the tool only: `dotctl` (in `/usr/lib/dotctl`, linked from
+`/usr/bin/dotctl`) and a prebuilt `dotctld`, so a machine needs no Go to run the bus. The config stays a git
+checkout; the packaged `dotctl` finds it through `REPO=` in `user.conf` (or `$DOTCTL_REPO`). A checkout's own
+`bin/dotctl` always uses that checkout.
+
+```sh
+cd packaging/arch
+makepkg -si                                            # from GitHub
+DOTCTL_GIT=file://$HOME/dotfiles_arch makepkg -si      # from this checkout's committed HEAD
+```
+
+`check()` runs the Go tests and `tests/dotctl.sh`. The repo has no license yet; the package says `unknown`.
 
 Later, `dotctl update` keeps the machine in sync: `git pull --ff-only`, then install, apply, migrate and the
 `update` hooks, using the dotctl that was just pulled.
