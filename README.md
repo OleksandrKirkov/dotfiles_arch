@@ -8,8 +8,11 @@ cd ~/dotfiles_arch
 ./install.sh
 ```
 
-`install.sh` runs `dotctl install` (packages, services, install hooks), `dotctl apply` (links), then
-`theme-switch --apply`.
+`install.sh` runs `dotctl install` (packages, services, install hooks), `dotctl apply` (links),
+`theme-switch --apply`, then `dotctl migrate`.
+
+Later, `dotctl update` keeps the machine in sync: `git pull --ff-only`, then install, apply, migrate and the
+`update` hooks, using the dotctl that was just pulled.
 
 ## dotctl
 
@@ -21,8 +24,11 @@ dotctl install --dry-run       # packages, services and install hooks it would r
 dotctl install                 # install them
 dotctl apply --dry-run tmux    # show what linking would change
 dotctl apply                   # link modules, dependencies first
-dotctl doctor [--drift]        # links, packages, services; --drift lists undeclared packages
-dotctl backup list             # files dotctl moved out of the way
+dotctl update [--dry-run]      # pull, install, apply, migrate, update hooks
+dotctl migrate [--status]      # run pending one-time migrations, or list them
+dotctl doctor [--drift]        # links, packages, services, migrations; --drift lists undeclared packages
+dotctl backup list             # files dotctl moved out of the way or copied
+dotctl backup add <path>       # copy a file into a backup (migrations call this before a change)
 dotctl backup restore <id>     # put them back
 ```
 
@@ -39,7 +45,13 @@ modules/<name>/
   home/                linked into ~ with stow --no-folding
   hooks/install.d/     run by dotctl install, after packages and services
   hooks/link.d/        run by dotctl apply, after the module is linked
+  hooks/update.d/      run by dotctl update, last
+  migrations/NNNN-slug run once per machine by dotctl migrate, after linking
 ```
+
+A migration moves a machine from an older layout to the current one. It must be a no-op where there is nothing
+to migrate (a fresh install), copy any file it changes with `dotctl backup add` first, and exit non-zero to stop
+for a person to decide. Ran migrations are recorded in `~/.local/state/dotctl/migrations`.
 
 Anything already at a module's target path is moved to `~/.local/state/dotctl/backups/<id>/`, never deleted.
 Your own hooks go in `~/.config/dotctl/hooks/<event>.d/`.
