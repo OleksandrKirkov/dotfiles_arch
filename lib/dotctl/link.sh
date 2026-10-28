@@ -18,8 +18,14 @@ path_is_repo_link() {
     [[ "$dest" == "$DOTCTL_ROOT" || "$dest" == "$DOTCTL_ROOT"/* ]]
 }
 
+# Paths a dry run already reported: nothing is removed, so a folded directory
+# link would otherwise be reported once per file below it.
+declare -A _LINK_DRY_REMOVED=()
+
 _link_remove_stale() {
     if dry_run; then
+        [[ -z "${_LINK_DRY_REMOVED[$1]:-}" ]] || return 0
+        _LINK_DRY_REMOVED[$1]=1
         log "would remove stale link ${1/#"$DOTCTL_TARGET"/\~}"
     else
         rm -- "$1"

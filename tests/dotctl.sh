@@ -140,6 +140,17 @@ test_replaces_stale_repo_links_without_backup() {
     [[ "$(backup_count)" == 0 ]] || fail "repo links were backed up"
 }
 
+test_dry_run_reports_folded_link_once() {
+    module tmux
+    file tmux .config/tmux/tmux.conf "conf"
+    file tmux .config/tmux/scripts/a.sh "a"
+    mkdir -p "$DOTCTL_TARGET/.config"
+    ln -s "$ROOT/.config/tmux" "$DOTCTL_TARGET/.config/tmux"
+    local out
+    out="$(dotctl apply --dry-run 2>&1)"
+    [[ "$(grep -c 'would remove stale link' <<<"$out")" == 1 ]] || fail "got: $out"
+}
+
 test_refuses_live_folded_repo_link() {
     module tmux
     file tmux .config/tmux/tmux.conf "conf"
