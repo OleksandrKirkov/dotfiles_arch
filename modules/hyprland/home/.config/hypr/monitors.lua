@@ -25,9 +25,6 @@ hl.monitor({
     position = "0x0",
     scale    = 1,
     bitdepth = 10,
-    -- No adaptive sync over this HDMI link (aquamarine: "No Adaptive sync support
-    -- for output"); with misc.vrr = 2 every fullscreen re-modeset (blanked) the monitor.
-    vrr      = 0,
 })
 
 hl.monitor({

@@ -115,6 +115,13 @@ hl.config({
         vrr                     = 2, -- fullscreen only
     },
 
+    render = {
+        -- Default 1 switches a monitor to HDR whenever a fullscreen app's content asks for
+        -- it. Each switch is a full modeset: the ASUS ultrawide blanked for ~3-4 s on every
+        -- fullscreen enter and exit (and showed its "HDR turn on" message). Stay in SDR.
+        cm_auto_hdr = 0,
+    },
+
     cursor = {
         no_hardware_cursors = true,
     },
