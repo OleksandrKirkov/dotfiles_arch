@@ -30,7 +30,7 @@ passed=0
 failed=0
 
 reset_sandbox() {
-    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker,installed,required-by,nm,run,bus.json,watch.out,aur-updates,repo-updates,picks,menu.log,user.conf,tool}
+    rm -rf "$ROOT" "$DOTCTL_TARGET" "$DOTCTL_STATE" "$DOTCTL_HOOKS" "$SANDBOX"/{calls.log,missing,explicit,enabled,flatpaks,migrations.log,git,marker,installed,required-by,nm,run,bus.json,watch.out,aur-updates,repo-updates,picks,menu.log,user.conf,tool,hs}
     mkdir -p "$ROOT/modules" "$DOTCTL_TARGET"
     cp -r "$REPO/bin" "$REPO/lib" "$REPO/libexec" "$ROOT/"
     make_stubs
@@ -1227,6 +1227,48 @@ test_bus_hook_links_packaged_dotctld() {
     local out
     if out="$(DOTCTL_REPO="$ROOT" DOTCTL_PACKAGED_DOTCTLD=/nowhere packaged_dotctl install bus 2>&1)"; then fail "passed without a packaged dotctld"; fi
     [[ "$out" == *"install the dotctl package"* ]] || fail "$out"
+}
+
+test_hyprland_session_keeps_crashed_instance_log() {
+    local hs="$SANDBOX/hs" runtime="$SANDBOX/hs/run"
+    mkdir -p "$hs/bin" "$runtime/hypr" "$hs/cache/hyprland" "$hs/state/hyprland/sessions"
+    # three sessions from earlier logins, for pruning
+    mkdir -p "$hs/state/hyprland/sessions"/2026-01-0{1,2,3}T000000
+    cat >"$hs/bin/Hyprland" <<STUB
+#!/usr/bin/env bash
+mkdir -p "$runtime/hypr/\$1"
+echo "instance \$1 log" >"$runtime/hypr/\$1/hyprland.log"
+[[ "\$1" == crashed ]] && echo "report" >"$hs/cache/hyprland/hyprlandCrashReport42.txt"
+sleep 1
+[[ "\$1" == crashed ]] && exit 139
+exit 0
+STUB
+    cat >"$hs/bin/fake-launcher" <<STUB
+#!/usr/bin/env bash
+echo "launcher: starting"
+"$hs/bin/Hyprland" crashed
+echo "launcher: Hyprland crashed, starting safe mode"
+sleep 2
+rm -rf "$runtime/hypr/crashed"   # gone, as after a reboot
+"$hs/bin/Hyprland" safe
+exit 0
+STUB
+    chmod +x "$hs/bin/Hyprland" "$hs/bin/fake-launcher"
+    local out status=0
+    out="$(XDG_RUNTIME_DIR="$runtime" XDG_CACHE_HOME="$hs/cache" XDG_STATE_HOME="$hs/state" \
+        HYPRLAND_SESSION_LAUNCHER="$hs/bin/fake-launcher" HYPRLAND_SESSION_KEEP=2 \
+        "$REPO/modules/hyprland/home/.local/bin/hyprland-session" 2>&1)" || status=$?
+    [[ "$status" == 0 ]] || fail "exit $status: $out"
+    local dir
+    dir="$(find "$hs/state/hyprland/sessions" -mindepth 1 -maxdepth 1 -type d -newer "$hs/bin/fake-launcher" | head -1)"
+    [[ -n "$dir" ]] || fail "no session directory: $out"
+    [[ "$(cat "$dir/crashed/hyprland.log" 2>/dev/null)" == "instance crashed log" ]] || fail "crashed instance log lost: $(ls -R "$dir")"
+    [[ "$(cat "$dir/safe/hyprland.log" 2>/dev/null)" == "instance safe log" ]] || fail "safe-mode log missing"
+    [[ -f "$dir/hyprlandCrashReport42.txt" ]] || fail "crash report not copied"
+    grep -q 'Hyprland crashed, starting safe mode' "$dir/launcher.log" || fail "launcher output not saved"
+    [[ "$(find "$hs/state/hyprland/sessions" -mindepth 1 -maxdepth 1 -type d | wc -l)" == 2 ]] \
+        || fail "pruning kept: $(ls "$hs/state/hyprland/sessions")"
+    [[ "$out" == *"logs saved in $dir"* ]] || fail "$out"
 }
 
 command -v go >/dev/null || { echo "tests need go to build dotctld" >&2; exit 1; }

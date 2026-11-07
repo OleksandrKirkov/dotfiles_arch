@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# hyprland-session: start Hyprland through start-hyprland and keep its logs.
+#
+# Hyprland writes its log to $XDG_RUNTIME_DIR/hypr/<instance>/hyprland.log,
+# which a reboot erases. When an instance crashes, start-hyprland starts a new
+# one in safe mode; this script copies every instance's log the moment that
+# instance exits, so the crashed one survives the reboot that usually follows.
+#
+# Saved per session in ${XDG_STATE_HOME:-~/.local/state}/hyprland/sessions/<start time>/:
+#   launcher.log             start-hyprland's own output
+#   <instance>/hyprland.log  each Hyprland instance's log
+#   hyprlandCrashReport*.txt crash reports written during the session
+# The newest $HYPRLAND_SESSION_KEEP sessions (default 20) are kept.
+#
+# Usage: hyprland-session [start-hyprland arguments...]
+# zsh aliases start-hyprland to this; 'command start-hyprland' skips it.
+
+set -uo pipefail
+
+launcher="${HYPRLAND_SESSION_LAUNCHER:-start-hyprland}"
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr"
+crash_dir="${XDG_CACHE_HOME:-$HOME/.cache}/hyprland"
+sessions="${XDG_STATE_HOME:-$HOME/.local/state}/hyprland/sessions"
+keep="${HYPRLAND_SESSION_KEEP:-20}"
+
+dir="$sessions/$(date +%Y-%m-%dT%H%M%S)"
+mkdir -p "$dir"
+marker="$dir/.started"
+: >"$marker"
+
+# archive: copy the logs of instances started in this session, and crash reports.
+archive() {
+    local log instance report
+    for log in "$runtime"/*/hyprland.log; do
+        [[ -f "$log" && "$log" -nt "$marker" ]] || continue
+        instance="${log%/hyprland.log}"
+        instance="${instance##*/}"
+        mkdir -p "$dir/$instance"
+        cp -f -- "$log" "$dir/$instance/hyprland.log"
+    done
+    for report in "$crash_dir"/hyprlandCrashReport*.txt; do
+        [[ -f "$report" && "$report" -nt "$marker" ]] && cp -f -- "$report" "$dir/"
+    done
+    return 0
+}
+
+# watch: wait on each Hyprland instance the launcher starts; archive when one
+# exits. With no instance running (between a crash and safe mode, or after one
+# that died before it was seen) archive right away: its log still exists.
+watch() {
+    # Found by parentage, not by name: the launcher is this script's other
+    # child (besides this watcher), an instance is the launcher's newest child.
+    local self="$BASHPID" launcher_pid="" pid last=""
+    for _ in $(seq 100); do
+        launcher_pid="$(pgrep -P "$$" | grep -vx "$self" | head -n1 || true)"
+        [[ -n "$launcher_pid" ]] && break
+        sleep 0.1
+    done
+    [[ -n "$launcher_pid" ]] || return 0
+    while kill -0 "$launcher_pid" 2>/dev/null; do
+        pid="$(pgrep -n -P "$launcher_pid" || true)"
+        if [[ -n "$pid" && "$pid" != "$last" ]]; then
+            last="$pid"
+            tail --pid="$pid" -f /dev/null
+            archive
+        elif [[ -z "$pid" ]]; then
+            archive
+            sleep 0.2
+        else
+            sleep 0.2
+        fi
+    done
+}
+
+prune() {
+    local -a old
+    mapfile -t old < <(find "$sessions" -mindepth 1 -maxdepth 1 -type d | sort | head -n "-$keep")
+    ((${#old[@]} == 0)) || rm -rf -- "${old[@]}"
+}
+
+watch &
+watcher=$!
+trap 'archive; kill "$watcher" 2>/dev/null' EXIT
+# A reboot from the safe-mode session sends TERM/HUP: exit through the EXIT trap.
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+"$launcher" "$@" >>"$dir/launcher.log" 2>&1
+status=$?
+
+kill "$watcher" 2>/dev/null
+wait "$watcher" 2>/dev/null
+archive
+trap - EXIT
+prune
+echo "hyprland-session: logs saved in $dir (start-hyprland exited $status)"
+exit "$status"

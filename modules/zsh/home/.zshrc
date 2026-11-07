@@ -137,6 +137,10 @@ start_sql_server() {
 alias tgauth="yaauth telegram --config ~/develop/telegram.config.example.json"
 alias antigravity="~/.local/bin/agy"
 alias brave-browser="brave-flatpak"
+# Start Hyprland through hyprland-session: it keeps every instance's log, including
+# one that crashed into safe mode, in ~/.local/state/hyprland/sessions/ (survives a reboot).
+# 'command start-hyprland' runs the plain launcher.
+alias start-hyprland="hyprland-session"
 
 # pnpm
 export PNPM_HOME="$HOME/.local/share/pnpm"
